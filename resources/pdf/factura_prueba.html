@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="es">
+    <head>
+        <meta charset="UTF-8">
+        <title>Factura de Compra - FAC-9032</title>
+        <style>
+        body { font-family: 'Arial', sans-serif; color: #333; margin: 40px; }
+        .header { border-bottom: 2px solid #0284c7; padding-bottom: 20px; margin-bottom: 30px; }
+        .title { font-size: 24px; font-weight: bold; color: #0f172a; }
+        .invoice-details { float: right; text-align: right; font-size: 14px; }
+        .company-details { font-size: 14px; margin-top: 5px; color: #475569; }
+        .table { w-index: 100%; border-collapse: collapse; margin-top: 30px; }
+        .table th { background-color: #0f172a; color: white; padding: 10px; text-align: left; font-size: 13px; }
+        .table td { padding: 12px 10px; border-bottom: 1px solid #e2e8f0; font-size: 13px; }
+        .total-section { margin-top: 30px; text-align: right; font-size: 16px; font-weight: bold; }
+        .footer { margin-top: 50px; text-align: center; font-size: 11px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 10px; }
+    </style>
+    </head>
+    <body>
+
+        <div class="header">
+            <div class="invoice-details">
+                <strong>COMPROBANTE ELECTRÓNICO</strong><br>
+                <span style="color: #0284c7; font-weight: bold;">N°:
+                    FAC-9032</span><br>
+                Fecha Emisión: 2026-06-04<br>
+                Condición: Contado
+            </div>
+            <div class="title">REPUESTOS EL SALVADOR S.A.</div>
+            <div class="company-details">
+                NIT: 0614-120520-102-4<br>
+                Boulevard Los Héroes, San Salvador<br>
+                Contacto: pedidos@repuestossalvador.com
+            </div>
+        </div>
+
+        <div style="margin-bottom: 20px; font-size: 14px;">
+            <strong>DATOS DEL ADQUIRIENTE:</strong><br>
+            SGA SYSTEM - TALLER AUTOMOTRIZ<br>
+            Cliente ID: #OP-ÓscarPérez
+        </div>
+
+        <table class="table" style="width: 100%;">
+            <thead>
+                <tr>
+                    <th>CÓDIGO PIEZA</th>
+                    <th>NOMBRE / DESCRIPCIÓN DEL REPUESTO</th>
+                    <th style="text-align: center;">CANTIDAD</th>
+                    <th style="text-align: right;">PRECIO UNITARIO</th>
+                    <th style="text-align: right;">SUBTOTAL</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td style="font-family: monospace;">REP-4330-O</td>
+                    <td><strong>Cambio de Aceite</strong></td>
+                    <td style="text-align: center;">1</td>
+                    <td style="text-align: right;">$252.50</td>
+                    <td style="text-align: right;">$252.50</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="total-section">
+            MONTO TOTAL A PAGAR: <span
+                style="color: #0284c7; font-size: 20px;">$252.50</span>
+        </div>
+
+        <div class="footer">
+            Este documento es un comprobante ficticio de auditoría interna para
+            el desarrollo del Sprint 2 - Sistema SGA.
+        </div>
+
+    </body>
+</html>
