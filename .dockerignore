@@ -1,0 +1,15 @@
+.env
+.env.*
+!.env.example
+.git
+.gitignore
+.phpunit.result.cache
+Grupo02
+node_modules
+public/storage
+storage/app/public/facturas
+storage/framework/cache/data
+storage/framework/sessions
+storage/framework/views/*.php
+storage/logs/*.log
+vendor

@@ -37,3 +37,29 @@ Variables importantes para despliegue:
 DB_CONNECTION=pgsql
 FRONTEND_URL=https://tu-frontend.vercel.app
 ```
+
+## Despliegue en Render
+
+El repo incluye `Dockerfile` para desplegar el backend como Web Service Docker en Render. Configura las variables de entorno reales en Render, no subas `.env` al repositorio.
+
+Variables mínimas:
+
+```env
+APP_ENV=production
+APP_DEBUG=false
+APP_KEY=base64:...
+APP_URL=https://tu-backend.onrender.com
+FRONTEND_URL=https://tu-frontend.vercel.app
+DB_CONNECTION=pgsql
+DB_HOST=...
+DB_PORT=5432
+DB_DATABASE=...
+DB_USERNAME=...
+DB_PASSWORD=...
+```
+
+Después del primer deploy ejecuta:
+
+```bash
+php artisan migrate --force --seed
+```
