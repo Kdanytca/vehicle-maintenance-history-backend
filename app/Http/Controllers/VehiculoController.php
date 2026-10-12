@@ -32,9 +32,9 @@ class VehiculoController extends Controller
 
         $propietario = Propietario::create([
             'nombre' => $request->propietario,
-            'documento_identidad' => 'N/A',
-            'telefono' => 'N/A',
-            'correo' => 'N/A'
+            'documento_identidad' => null,
+            'telefono' => null,
+            'correo' => null
         ]);
 
         Vehiculo::create([

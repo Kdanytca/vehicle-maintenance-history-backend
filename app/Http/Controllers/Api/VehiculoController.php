@@ -3,11 +3,14 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Factura;
 use App\Models\Mantenimiento;
 use App\Models\Propietario;
+use App\Models\Repuesto;
 use App\Models\Vehiculo;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class VehiculoController extends Controller
 {
@@ -28,9 +31,9 @@ class VehiculoController extends Controller
 
         $propietario = Propietario::create([
             'nombre' => $data['propietario'],
-            'documento_identidad' => 'N/A',
-            'telefono' => 'N/A',
-            'correo' => 'N/A',
+            'documento_identidad' => null,
+            'telefono' => null,
+            'correo' => null,
         ]);
 
         $vehiculo = Vehiculo::create([
@@ -70,6 +73,56 @@ class VehiculoController extends Controller
         return response()->json($vehiculo->refresh()->load('propietario'));
     }
 
+    public function destroy(Request $request, int $vehiculo): JsonResponse
+    {
+        $vehiculo = Vehiculo::findOrFail($vehiculo);
+        $impacto = $this->deleteImpact($vehiculo);
+
+        $debeConfirmar = $impacto['mantenimientos_pendientes'] > 0
+            || $impacto['mantenimientos_total'] > 0
+            || $impacto['facturas_total'] > 0
+            || $impacto['repuestos_total'] > 0;
+
+        if (! $debeConfirmar && $request->boolean('solo_validar')) {
+            return response()->json([
+                'message' => 'El vehículo no tiene registros relacionados.',
+                'requires_confirmation' => false,
+                'impacto' => $impacto,
+            ]);
+        }
+
+        if ($debeConfirmar && ! $request->boolean('confirmar_eliminacion')) {
+            return response()->json([
+                'message' => 'Confirma la eliminación del vehículo y sus registros relacionados.',
+                'requires_confirmation' => true,
+                'impacto' => $impacto,
+            ], 409);
+        }
+
+        if ($impacto['mantenimientos_pendientes'] > 0 && ! $request->boolean('cancelar_pendientes')) {
+            return response()->json([
+                'message' => 'El vehículo tiene mantenimientos pendientes. Confirma si deseas cancelarlos antes de eliminar.',
+                'requires_pending_cancellation' => true,
+                'impacto' => $impacto,
+            ], 409);
+        }
+
+        DB::transaction(function () use ($vehiculo, $impacto): void {
+            if ($impacto['mantenimientos_pendientes'] > 0) {
+                Mantenimiento::where('id_vehiculo', $vehiculo->id_vehiculo)
+                    ->whereIn('estado', ['Pendiente', 'En Proceso'])
+                    ->update(['estado' => 'Cancelado']);
+            }
+
+            $vehiculo->delete();
+        });
+
+        return response()->json([
+            'message' => 'Vehículo eliminado correctamente.',
+            'impacto' => $impacto,
+        ]);
+    }
+
     public function buscar(Request $request): JsonResponse
     {
         $data = $request->validate(['termino' => 'required|string']);
@@ -100,5 +153,21 @@ class VehiculoController extends Controller
         }
 
         return response()->json(compact('vehiculo', 'mantenimientos'));
+    }
+
+    private function deleteImpact(Vehiculo $vehiculo): array
+    {
+        $mantenimientos = Mantenimiento::where('id_vehiculo', $vehiculo->id_vehiculo);
+        $mantenimientoIds = (clone $mantenimientos)->pluck('id_mantenimiento');
+        $facturaIds = Factura::where('id_vehiculo', $vehiculo->id_vehiculo)->pluck('id_factura');
+
+        return [
+            'mantenimientos_pendientes' => (clone $mantenimientos)->whereIn('estado', ['Pendiente', 'En Proceso'])->count(),
+            'mantenimientos_total' => (clone $mantenimientos)->count(),
+            'facturas_total' => $facturaIds->count(),
+            'repuestos_total' => Repuesto::whereIn('id_factura', $facturaIds)
+                ->orWhereIn('id_mantenimiento', $mantenimientoIds)
+                ->count(),
+        ];
     }
 }

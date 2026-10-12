@@ -15,7 +15,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/me', [AuthController::class, 'me']);
     Route::post('/logout', [AuthController::class, 'logout']);
 
-    Route::apiResource('vehiculos', VehiculoController::class)->except(['destroy']);
+    Route::apiResource('vehiculos', VehiculoController::class);
     Route::get('/vehiculos-buscar', [VehiculoController::class, 'buscar']);
     Route::get('/reportes/placa', [VehiculoController::class, 'reportePorPlaca']);
 

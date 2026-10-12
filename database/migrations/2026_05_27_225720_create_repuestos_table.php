@@ -28,14 +28,14 @@ return new class extends Migration
                 $table->foreign('id_mantenimiento')
                     ->references('id_mantenimiento')
                     ->on('mantenimientos')
-                    ->onDelete('set null');
+                    ->onDelete('cascade');
             }
 
             if (Schema::hasTable('facturas')) {
                 $table->foreign('id_factura')
                     ->references('id_factura')
                     ->on('facturas')
-                    ->onDelete('set null');
+                    ->onDelete('cascade');
             }
         });
     }

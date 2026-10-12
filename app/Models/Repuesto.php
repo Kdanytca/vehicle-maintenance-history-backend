@@ -17,9 +17,13 @@ class Repuesto extends Model
         'codigo_pieza',
         'costo_unitario',
         'id_mantenimiento',
-        'id_proveedor',
         'id_factura'
     ];
+
+    public function mantenimiento()
+    {
+        return $this->belongsTo(Mantenimiento::class, 'id_mantenimiento', 'id_mantenimiento');
+    }
 
     // Relación inversa: Un repuesto pertenece a una factura cargada
     public function factura()

@@ -26,4 +26,14 @@ class Vehiculo extends Model
             'id_propietario'
         );
     }
+
+    public function mantenimientos()
+    {
+        return $this->hasMany(Mantenimiento::class, 'id_vehiculo', 'id_vehiculo');
+    }
+
+    public function facturas()
+    {
+        return $this->hasMany(Factura::class, 'id_vehiculo', 'id_vehiculo');
+    }
 }

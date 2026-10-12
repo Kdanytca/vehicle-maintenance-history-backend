@@ -29,14 +29,22 @@ CREATE UNIQUE INDEX IF NOT EXISTS permisos_nombre_permiso_unique ON permisos (no
 CREATE TABLE IF NOT EXISTS propietarios (
     id_propietario BIGSERIAL PRIMARY KEY,
     nombre VARCHAR(100) NOT NULL,
-    documento_identidad VARCHAR(20) NOT NULL,
+    documento_identidad VARCHAR(20),
     telefono VARCHAR(20),
     correo VARCHAR(100),
     created_at TIMESTAMP(0),
     updated_at TIMESTAMP(0)
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS propietarios_documento_identidad_unique ON propietarios (documento_identidad);
+ALTER TABLE propietarios ALTER COLUMN documento_identidad DROP NOT NULL;
+
+UPDATE propietarios
+SET documento_identidad = NULL
+WHERE documento_identidad = 'N/A';
+
+DROP INDEX IF EXISTS propietarios_documento_identidad_unique;
+CREATE UNIQUE INDEX propietarios_documento_identidad_unique ON propietarios (documento_identidad)
+WHERE documento_identidad IS NOT NULL AND documento_identidad <> 'N/A';
 
 CREATE TABLE IF NOT EXISTS notificaciones (
     id_notificacion BIGSERIAL PRIMARY KEY,
@@ -122,9 +130,14 @@ CREATE TABLE IF NOT EXISTS repuestos (
     id_factura BIGINT,
     created_at TIMESTAMP(0),
     updated_at TIMESTAMP(0),
-    CONSTRAINT repuestos_id_mantenimiento_foreign FOREIGN KEY (id_mantenimiento) REFERENCES mantenimientos(id_mantenimiento) ON DELETE SET NULL,
-    CONSTRAINT repuestos_id_factura_foreign FOREIGN KEY (id_factura) REFERENCES facturas(id_factura) ON DELETE SET NULL
+    CONSTRAINT repuestos_id_mantenimiento_foreign FOREIGN KEY (id_mantenimiento) REFERENCES mantenimientos(id_mantenimiento) ON DELETE CASCADE,
+    CONSTRAINT repuestos_id_factura_foreign FOREIGN KEY (id_factura) REFERENCES facturas(id_factura) ON DELETE CASCADE
 );
+
+ALTER TABLE repuestos DROP CONSTRAINT IF EXISTS repuestos_id_mantenimiento_foreign;
+ALTER TABLE repuestos DROP CONSTRAINT IF EXISTS repuestos_id_factura_foreign;
+ALTER TABLE repuestos ADD CONSTRAINT repuestos_id_mantenimiento_foreign FOREIGN KEY (id_mantenimiento) REFERENCES mantenimientos(id_mantenimiento) ON DELETE CASCADE;
+ALTER TABLE repuestos ADD CONSTRAINT repuestos_id_factura_foreign FOREIGN KEY (id_factura) REFERENCES facturas(id_factura) ON DELETE CASCADE;
 
 CREATE UNIQUE INDEX IF NOT EXISTS repuestos_codigo_pieza_unique ON repuestos (codigo_pieza) WHERE codigo_pieza IS NOT NULL;
 
@@ -266,7 +279,7 @@ ON CONFLICT (username) DO UPDATE SET
 
 INSERT INTO propietarios (nombre, documento_identidad, telefono, correo, created_at, updated_at) VALUES
     ('Carlos Martinez', '01234567-8', '7777-1111', 'carlos.demo@example.com', NOW(), NOW())
-ON CONFLICT (documento_identidad) DO UPDATE SET
+ON CONFLICT (documento_identidad) WHERE documento_identidad IS NOT NULL AND documento_identidad <> 'N/A' DO UPDATE SET
     nombre = EXCLUDED.nombre,
     telefono = EXCLUDED.telefono,
     correo = EXCLUDED.correo,
