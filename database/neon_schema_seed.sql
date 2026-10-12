@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS roles (
     updated_at TIMESTAMP(0)
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS roles_nombre_rol_unique ON roles (nombre_rol);
+DROP INDEX IF EXISTS roles_nombre_rol_unique;
 
 CREATE TABLE IF NOT EXISTS permisos (
     id_permiso BIGSERIAL PRIMARY KEY,
@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS permisos (
     updated_at TIMESTAMP(0)
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS permisos_nombre_permiso_unique ON permisos (nombre_permiso);
+DROP INDEX IF EXISTS permisos_nombre_permiso_unique;
 
 CREATE TABLE IF NOT EXISTS propietarios (
     id_propietario BIGSERIAL PRIMARY KEY,
@@ -43,8 +43,6 @@ SET documento_identidad = NULL
 WHERE documento_identidad = 'N/A';
 
 DROP INDEX IF EXISTS propietarios_documento_identidad_unique;
-CREATE UNIQUE INDEX propietarios_documento_identidad_unique ON propietarios (documento_identidad)
-WHERE documento_identidad IS NOT NULL AND documento_identidad <> 'N/A';
 
 CREATE TABLE IF NOT EXISTS notificaciones (
     id_notificacion BIGSERIAL PRIMARY KEY,
@@ -119,7 +117,7 @@ CREATE TABLE IF NOT EXISTS facturas (
     CONSTRAINT facturas_id_vehiculo_foreign FOREIGN KEY (id_vehiculo) REFERENCES vehiculos(id_vehiculo) ON DELETE CASCADE
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS facturas_numero_factura_unique ON facturas (numero_factura);
+DROP INDEX IF EXISTS facturas_numero_factura_unique;
 
 CREATE TABLE IF NOT EXISTS repuestos (
     id_repuesto BIGSERIAL PRIMARY KEY,
@@ -130,16 +128,14 @@ CREATE TABLE IF NOT EXISTS repuestos (
     id_factura BIGINT,
     created_at TIMESTAMP(0),
     updated_at TIMESTAMP(0),
-    CONSTRAINT repuestos_id_mantenimiento_foreign FOREIGN KEY (id_mantenimiento) REFERENCES mantenimientos(id_mantenimiento) ON DELETE CASCADE,
-    CONSTRAINT repuestos_id_factura_foreign FOREIGN KEY (id_factura) REFERENCES facturas(id_factura) ON DELETE CASCADE
+    CONSTRAINT repuestos_id_mantenimiento_foreign FOREIGN KEY (id_mantenimiento) REFERENCES mantenimientos(id_mantenimiento) ON DELETE CASCADE
 );
 
 ALTER TABLE repuestos DROP CONSTRAINT IF EXISTS repuestos_id_mantenimiento_foreign;
 ALTER TABLE repuestos DROP CONSTRAINT IF EXISTS repuestos_id_factura_foreign;
 ALTER TABLE repuestos ADD CONSTRAINT repuestos_id_mantenimiento_foreign FOREIGN KEY (id_mantenimiento) REFERENCES mantenimientos(id_mantenimiento) ON DELETE CASCADE;
-ALTER TABLE repuestos ADD CONSTRAINT repuestos_id_factura_foreign FOREIGN KEY (id_factura) REFERENCES facturas(id_factura) ON DELETE CASCADE;
 
-CREATE UNIQUE INDEX IF NOT EXISTS repuestos_codigo_pieza_unique ON repuestos (codigo_pieza) WHERE codigo_pieza IS NOT NULL;
+DROP INDEX IF EXISTS repuestos_codigo_pieza_unique;
 
 CREATE TABLE IF NOT EXISTS historial_cambios (
     id_auditoria BIGSERIAL PRIMARY KEY,
@@ -218,22 +214,28 @@ WHERE NOT EXISTS (
     SELECT 1 FROM migrations WHERE migrations.migration = seed.migration
 );
 
-INSERT INTO roles (nombre_rol, descripcion, created_at, updated_at) VALUES
-    ('admin', 'Administrador del sistema', NOW(), NOW()),
-    ('mecanico', 'Mecánico del taller', NOW(), NOW())
-ON CONFLICT (nombre_rol) DO UPDATE SET
-    descripcion = EXCLUDED.descripcion,
-    updated_at = NOW();
+INSERT INTO roles (nombre_rol, descripcion, created_at, updated_at)
+SELECT seed.nombre_rol, seed.descripcion, NOW(), NOW()
+FROM (VALUES
+    ('admin', 'Administrador del sistema'),
+    ('mecanico', 'Mecánico del taller')
+) AS seed(nombre_rol, descripcion)
+WHERE NOT EXISTS (
+    SELECT 1 FROM roles WHERE roles.nombre_rol = seed.nombre_rol
+);
 
-INSERT INTO permisos (nombre_permiso, descripcion, created_at, updated_at) VALUES
-    ('gestionar_usuarios', 'Crear y administrar usuarios del sistema', NOW(), NOW()),
-    ('gestionar_roles', 'Crear roles y asignar permisos', NOW(), NOW()),
-    ('gestionar_vehiculos', 'Registrar y consultar vehículos', NOW(), NOW()),
-    ('gestionar_mantenimientos', 'Registrar mantenimientos y consultar historial', NOW(), NOW()),
-    ('gestionar_repuestos', 'Cargar facturas, repuestos y alertas', NOW(), NOW())
-ON CONFLICT (nombre_permiso) DO UPDATE SET
-    descripcion = EXCLUDED.descripcion,
-    updated_at = NOW();
+INSERT INTO permisos (nombre_permiso, descripcion, created_at, updated_at)
+SELECT seed.nombre_permiso, seed.descripcion, NOW(), NOW()
+FROM (VALUES
+    ('gestionar_usuarios', 'Crear y administrar usuarios del sistema'),
+    ('gestionar_roles', 'Crear roles y asignar permisos'),
+    ('gestionar_vehiculos', 'Registrar y consultar vehículos'),
+    ('gestionar_mantenimientos', 'Registrar mantenimientos y consultar historial'),
+    ('gestionar_repuestos', 'Cargar facturas, repuestos y alertas')
+) AS seed(nombre_permiso, descripcion)
+WHERE NOT EXISTS (
+    SELECT 1 FROM permisos WHERE permisos.nombre_permiso = seed.nombre_permiso
+);
 
 INSERT INTO roles_permisos (id_rol, id_permiso)
 SELECT roles.id_rol, permisos.id_permiso
@@ -277,13 +279,11 @@ ON CONFLICT (username) DO UPDATE SET
     id_rol = EXCLUDED.id_rol,
     updated_at = NOW();
 
-INSERT INTO propietarios (nombre, documento_identidad, telefono, correo, created_at, updated_at) VALUES
-    ('Carlos Martinez', '01234567-8', '7777-1111', 'carlos.demo@example.com', NOW(), NOW())
-ON CONFLICT (documento_identidad) WHERE documento_identidad IS NOT NULL AND documento_identidad <> 'N/A' DO UPDATE SET
-    nombre = EXCLUDED.nombre,
-    telefono = EXCLUDED.telefono,
-    correo = EXCLUDED.correo,
-    updated_at = NOW();
+INSERT INTO propietarios (nombre, documento_identidad, telefono, correo, created_at, updated_at)
+SELECT 'Carlos Martinez', '01234567-8', '7777-1111', 'carlos.demo@example.com', NOW(), NOW()
+WHERE NOT EXISTS (
+    SELECT 1 FROM propietarios WHERE documento_identidad = '01234567-8'
+);
 
 INSERT INTO vehiculos (placa, marca, modelo, anio, id_propietario, created_at, updated_at)
 SELECT 'P-123456', 'Toyota', 'Corolla', 2020, id_propietario, NOW(), NOW()
@@ -307,13 +307,11 @@ AND NOT EXISTS (
 
 INSERT INTO facturas (numero_factura, fecha_emision, monto_total, ruta_pdf_almacenamiento, id_vehiculo, created_at, updated_at)
 SELECT 'FAC-DEMO-001', DATE '2026-09-09', 38.50, 'facturas/demo-fac-001.pdf', id_vehiculo, NOW(), NOW()
-FROM vehiculos WHERE placa = 'P-123456'
-ON CONFLICT (numero_factura) DO UPDATE SET
-    fecha_emision = EXCLUDED.fecha_emision,
-    monto_total = EXCLUDED.monto_total,
-    ruta_pdf_almacenamiento = EXCLUDED.ruta_pdf_almacenamiento,
-    id_vehiculo = EXCLUDED.id_vehiculo,
-    updated_at = NOW();
+FROM vehiculos
+WHERE placa = 'P-123456'
+AND NOT EXISTS (
+    SELECT 1 FROM facturas WHERE numero_factura = 'FAC-DEMO-001'
+);
 
 INSERT INTO repuestos (nombre_pieza, codigo_pieza, costo_unitario, id_mantenimiento, id_factura, created_at, updated_at)
 SELECT 'Filtro de Aceite Demo', 'REP-DEMO-001', 38.50, mantenimientos.id_mantenimiento, facturas.id_factura, NOW(), NOW()
@@ -323,12 +321,9 @@ JOIN vehiculos ON vehiculos.id_vehiculo = mantenimientos.id_vehiculo
 WHERE vehiculos.placa = 'P-123456'
 AND mantenimientos.fecha_servicio = DATE '2026-09-09'
 AND facturas.numero_factura = 'FAC-DEMO-001'
-ON CONFLICT (codigo_pieza) WHERE codigo_pieza IS NOT NULL DO UPDATE SET
-    nombre_pieza = EXCLUDED.nombre_pieza,
-    costo_unitario = EXCLUDED.costo_unitario,
-    id_mantenimiento = EXCLUDED.id_mantenimiento,
-    id_factura = EXCLUDED.id_factura,
-    updated_at = NOW();
+AND NOT EXISTS (
+    SELECT 1 FROM repuestos WHERE codigo_pieza = 'REP-DEMO-001'
+);
 
 INSERT INTO notificaciones (destinatario, asunto, mensaje, tipo_envio, fecha_envio, created_at, updated_at)
 SELECT correo, 'Servicio de demostracion registrado', 'Su vehiculo P-123456 tiene un mantenimiento de demostracion en proceso.', 'AUTOMÁTICO', NOW(), NOW(), NOW()

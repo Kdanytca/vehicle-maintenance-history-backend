@@ -76,6 +76,7 @@ class VehiculoController extends Controller
     public function destroy(Request $request, int $vehiculo): JsonResponse
     {
         $vehiculo = Vehiculo::findOrFail($vehiculo);
+        $vehiculoId = $vehiculo->id_vehiculo;
         $impacto = $this->deleteImpact($vehiculo);
 
         $debeConfirmar = $impacto['mantenimientos_pendientes'] > 0
@@ -107,18 +108,49 @@ class VehiculoController extends Controller
             ], 409);
         }
 
-        DB::transaction(function () use ($vehiculo, $impacto): void {
+        $eliminados = DB::transaction(function () use ($vehiculoId, $impacto): array {
+            $mantenimientoIds = Mantenimiento::where('id_vehiculo', $vehiculoId)->pluck('id_mantenimiento');
+            $facturaIds = Factura::where('id_vehiculo', $vehiculoId)->pluck('id_factura');
+
             if ($impacto['mantenimientos_pendientes'] > 0) {
-                Mantenimiento::where('id_vehiculo', $vehiculo->id_vehiculo)
+                Mantenimiento::where('id_vehiculo', $vehiculoId)
                     ->whereIn('estado', ['Pendiente', 'En Proceso'])
                     ->update(['estado' => 'Cancelado']);
             }
 
-            $vehiculo->delete();
+            $repuestosEliminados = Repuesto::whereIn('id_factura', $facturaIds)
+                ->orWhereIn('id_mantenimiento', $mantenimientoIds)
+                ->delete();
+
+            $facturasEliminadas = Factura::where('id_vehiculo', $vehiculoId)->delete();
+            $mantenimientosEliminados = Mantenimiento::where('id_vehiculo', $vehiculoId)->delete();
+            $vehiculosEliminados = Vehiculo::whereKey($vehiculoId)->delete();
+
+            return [
+                'repuestos' => $repuestosEliminados,
+                'facturas' => $facturasEliminadas,
+                'mantenimientos' => $mantenimientosEliminados,
+                'vehiculos' => $vehiculosEliminados,
+            ];
         });
+
+        $existeDespues = Vehiculo::whereKey($vehiculoId)->exists();
+
+        if ($existeDespues || $eliminados['vehiculos'] !== 1) {
+            return response()->json([
+                'message' => 'No se pudo confirmar la eliminación del vehículo.',
+                'deleted_id' => $vehiculoId,
+                'exists_after_delete' => $existeDespues,
+                'deleted_counts' => $eliminados,
+                'impacto' => $impacto,
+            ], 500);
+        }
 
         return response()->json([
             'message' => 'Vehículo eliminado correctamente.',
+            'deleted_id' => $vehiculoId,
+            'exists_after_delete' => false,
+            'deleted_counts' => $eliminados,
             'impacto' => $impacto,
         ]);
     }
