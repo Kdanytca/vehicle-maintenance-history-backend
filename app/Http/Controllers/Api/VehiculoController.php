@@ -108,33 +108,68 @@ class VehiculoController extends Controller
             ], 409);
         }
 
-        $eliminados = DB::transaction(function () use ($vehiculoId, $impacto): array {
-            $mantenimientoIds = Mantenimiento::where('id_vehiculo', $vehiculoId)->pluck('id_mantenimiento');
-            $facturaIds = Factura::where('id_vehiculo', $vehiculoId)->pluck('id_factura');
+        $step = 'obtener_mantenimientos';
 
+        try {
+            $mantenimientoIds = DB::table('mantenimientos')
+                ->where('id_vehiculo', $vehiculoId)
+                ->pluck('id_mantenimiento');
+
+            $step = 'obtener_facturas';
+            $facturaIds = DB::table('facturas')
+                ->where('id_vehiculo', $vehiculoId)
+                ->pluck('id_factura');
+
+            $step = 'cancelar_mantenimientos_pendientes';
             if ($impacto['mantenimientos_pendientes'] > 0) {
-                Mantenimiento::where('id_vehiculo', $vehiculoId)
+                DB::table('mantenimientos')
+                    ->where('id_vehiculo', $vehiculoId)
                     ->whereIn('estado', ['Pendiente', 'En Proceso'])
                     ->update(['estado' => 'Cancelado']);
             }
 
-            $repuestosEliminados = Repuesto::whereIn('id_factura', $facturaIds)
-                ->orWhereIn('id_mantenimiento', $mantenimientoIds)
+            $step = 'eliminar_repuestos';
+            $repuestosEliminados = DB::table('repuestos')
+                ->where(function ($query) use ($facturaIds, $mantenimientoIds): void {
+                    $query->whereIn('id_factura', $facturaIds)
+                        ->orWhereIn('id_mantenimiento', $mantenimientoIds);
+                })
                 ->delete();
 
-            $facturasEliminadas = Factura::where('id_vehiculo', $vehiculoId)->delete();
-            $mantenimientosEliminados = Mantenimiento::where('id_vehiculo', $vehiculoId)->delete();
-            $vehiculosEliminados = Vehiculo::whereKey($vehiculoId)->delete();
+            $step = 'eliminar_facturas';
+            $facturasEliminadas = DB::table('facturas')
+                ->where('id_vehiculo', $vehiculoId)
+                ->delete();
 
-            return [
+            $step = 'eliminar_mantenimientos';
+            $mantenimientosEliminados = DB::table('mantenimientos')
+                ->where('id_vehiculo', $vehiculoId)
+                ->delete();
+
+            $step = 'eliminar_vehiculo';
+            $vehiculosEliminados = DB::table('vehiculos')
+                ->where('id_vehiculo', $vehiculoId)
+                ->delete();
+
+            $eliminados = [
                 'repuestos' => $repuestosEliminados,
                 'facturas' => $facturasEliminadas,
                 'mantenimientos' => $mantenimientosEliminados,
                 'vehiculos' => $vehiculosEliminados,
             ];
-        });
+        } catch (\Throwable $exception) {
+            return response()->json([
+                'message' => 'Error eliminando vehículo.',
+                'step' => $step,
+                'deleted_id' => $vehiculoId,
+                'error' => $exception->getMessage(),
+                'impacto' => $impacto,
+            ], 500);
+        }
 
-        $existeDespues = Vehiculo::whereKey($vehiculoId)->exists();
+        $existeDespues = DB::table('vehiculos')
+            ->where('id_vehiculo', $vehiculoId)
+            ->exists();
 
         if ($existeDespues || $eliminados['vehiculos'] !== 1) {
             return response()->json([
