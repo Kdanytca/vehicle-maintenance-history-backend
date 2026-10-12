@@ -1,5 +1,7 @@
 FROM php:8.3-apache
 
+LABEL org.opencontainers.image.description="Vehicle maintenance backend for Render"
+
 RUN apt-get update && apt-get install -y \
     git \
     libicu-dev \
