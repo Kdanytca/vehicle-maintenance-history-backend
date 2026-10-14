@@ -22,11 +22,17 @@ class VehiculoController extends Controller
     public function store(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'placa' => 'required|unique:vehiculos,placa',
-            'marca' => 'required|string|max:100',
-            'modelo' => 'required|string|max:100',
-            'anio' => 'required|integer|min:1900|max:' . (now()->year + 1),
-            'propietario' => 'required|string|max:150',
+            'placa' => [
+            'required',
+            'string',
+            'max:10',
+            'regex:/^(P|A|C|M|D|T|RE|AB|MI|CC|CD|N|V)[0-9]{3}-[0-9]{3}$/i',
+            'unique:vehiculos,placa',
+    ],
+    'marca' => 'required|string|max:100',
+    'modelo' => 'required|string|max:100',
+    'anio' => 'required|integer|min:1900|max:' . (now()->year + 1),
+    'propietario' => 'required|string|max:150',
         ]);
 
         $propietario = Propietario::create([
@@ -60,12 +66,18 @@ class VehiculoController extends Controller
         $vehiculo = Vehiculo::with('propietario')->findOrFail($vehiculo);
 
         $data = $request->validate([
-            'placa' => 'required|unique:vehiculos,placa,' . $vehiculo->id_vehiculo . ',id_vehiculo',
-            'marca' => 'required|string|max:100',
-            'modelo' => 'required|string|max:100',
-            'anio' => 'required|integer|min:1900|max:' . (now()->year + 1),
-            'propietario' => 'required|string|max:150',
-        ]);
+           'placa' => [
+               'required',
+               'string',
+               'max:10',
+               'regex:/^(P|A|C|M|D|T|RE|AB|MI|CC|CD|N|V)[0-9]{3}-[0-9]{3}$/i',
+               'unique:vehiculos,placa,' . $vehiculo->id_vehiculo . ',id_vehiculo',
+    ],
+    'marca' => 'required|string|max:100',
+    'modelo' => 'required|string|max:100',
+    'anio' => 'required|integer|min:1900|max:' . (now()->year + 1),
+    'propietario' => 'required|string|max:150',
+]);
 
         $vehiculo->update($request->only('placa', 'marca', 'modelo', 'anio'));
         $vehiculo->propietario?->update(['nombre' => $data['propietario']]);
