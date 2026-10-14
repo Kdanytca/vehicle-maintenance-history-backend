@@ -15,7 +15,7 @@ class MantenimientoController extends Controller
     public function index(): JsonResponse
     {
         return response()->json([
-            'mantenimientos' => Mantenimiento::with(['vehiculo', 'encargado'])
+            'mantenimientos' => Mantenimiento::with(['vehiculo', 'encargado.rol'])
                 ->latest('id_mantenimiento')
                 ->get(),
             'vehiculos' => Vehiculo::all(),
@@ -30,7 +30,7 @@ class MantenimientoController extends Controller
         $mantenimiento = Mantenimiento::create($datos);
 
         return response()->json(
-            $mantenimiento->load(['vehiculo', 'encargado']),
+            $mantenimiento->load(['vehiculo', 'encargado.rol']),
             201
         );
     }
@@ -47,7 +47,7 @@ class MantenimientoController extends Controller
         $registro->update($datos);
 
         return response()->json(
-            $registro->load(['vehiculo', 'encargado'])
+            $registro->load(['vehiculo', 'encargado.rol'])
         );
     }
 
