@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\AuditLogController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\HistorialVehiculoController;
 use App\Http\Controllers\Api\MantenimientoController;
@@ -28,6 +29,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/notificaciones/enviar', [RepuestoController::class, 'enviarNotificacion']);
 
     Route::middleware('solo.admin')->group(function () {
+        Route::get('/audit-logs', [AuditLogController::class, 'index']);
         Route::apiResource('usuarios', UsuarioController::class)->except(['show']);
         Route::get('/roles-permisos', [RolPermisoController::class, 'index']);
         Route::post('/roles', [RolPermisoController::class, 'storeRol']);
