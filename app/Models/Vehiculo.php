@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Models\Cliente;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Model;
 
 class Vehiculo extends Model
@@ -25,6 +27,11 @@ class Vehiculo extends Model
             'id_propietario',
             'id_propietario'
         );
+    }
+
+    public function cliente(): BelongsTo
+    {
+        return $this->belongsTo(Cliente::class, 'cliente_id');
     }
 
     public function mantenimientos()
