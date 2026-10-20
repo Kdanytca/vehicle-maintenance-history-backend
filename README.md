@@ -58,8 +58,18 @@ DB_USERNAME=...
 DB_PASSWORD=...
 ```
 
-Después del primer deploy ejecuta:
+### Migraciones automaticas en Neon
+
+El `Dockerfile` inicia `docker-entrypoint.sh`, que ejecuta este comando antes de Apache en cada arranque (incluidos deploys y reinicios):
 
 ```bash
-php artisan migrate --force --seed
+php artisan migrate --force --no-interaction
 ```
+
+Usa la conexion de base de datos configurada en Render. Para Neon configura tambien `DB_SSLMODE=require`. Si una migracion falla, el contenedor se detiene y el error aparece en los logs; Apache solo inicia si el comando termina correctamente. No se ejecutan seeders automaticamente.
+
+Laravel consulta `migrations` y aplica solamente las pendientes. Para futuros cambios crea archivos nuevos en `database/migrations`; editar una migracion ya aplicada no vuelve a ejecutarla. Este arranque esta pensado para un servicio con una instancia; con varias instancias ejecuta las migraciones una sola vez en un paso de predeploy.
+
+La bitacora `database/neon_schema_seed.sql` ya registra las migraciones del esquema creado manualmente. La migracion de facturas usa ahora una sola extension `.php`, coincidiendo con esa bitacora. Si otra base fue creada con Artisan y registro `2026_06_02_225717_create_facturas_table.php`, corrige ese registro al nombre sin `.php` antes de desplegar alli.
+
+El modulo de clientes se aplica automaticamente en el siguiente deploy si sus dos migraciones siguen pendientes. `database/neon_clientes.sql` contiene solamente esa actualizacion para quien necesite aplicarla manualmente: tambien registra las dos migraciones. No es necesario ejecutarlo si el despliegue automatico ya las aplico, ni ejecutarlo mientras el despliegue esta migrando. El archivo completo incluye datos demo y no debe usarse como actualizacion de produccion.

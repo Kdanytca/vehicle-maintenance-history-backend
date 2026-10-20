@@ -91,6 +91,35 @@ CREATE TABLE IF NOT EXISTS vehiculos (
 
 CREATE UNIQUE INDEX IF NOT EXISTS vehiculos_placa_unique ON vehiculos (placa);
 
+-- Modulo de clientes (migraciones del 17 de octubre de 2026).
+CREATE TABLE IF NOT EXISTS clientes (
+    id BIGSERIAL PRIMARY KEY,
+    nombre VARCHAR(255) NOT NULL,
+    apellido VARCHAR(255) NOT NULL,
+    dui VARCHAR(10) NOT NULL,
+    telefono VARCHAR(15) NOT NULL,
+    correo_electronico VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP(0),
+    updated_at TIMESTAMP(0)
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS clientes_dui_unique ON clientes (dui);
+CREATE UNIQUE INDEX IF NOT EXISTS clientes_correo_electronico_unique ON clientes (correo_electronico);
+
+ALTER TABLE vehiculos ADD COLUMN IF NOT EXISTS cliente_id BIGINT;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conrelid = 'vehiculos'::regclass
+          AND conname = 'vehiculos_cliente_id_foreign'
+    ) THEN
+        ALTER TABLE vehiculos ADD CONSTRAINT vehiculos_cliente_id_foreign
+            FOREIGN KEY (cliente_id) REFERENCES clientes(id) ON DELETE CASCADE;
+    END IF;
+END $$;
+
 CREATE TABLE IF NOT EXISTS mantenimientos (
     id_mantenimiento BIGSERIAL PRIMARY KEY,
     fecha_servicio DATE NOT NULL,
@@ -208,7 +237,9 @@ FROM (VALUES
     ('2026_06_02_000516_create_sessions_table'),
     ('2026_06_02_004805_create_cache_table'),
     ('2026_06_02_225717_create_facturas_table'),
-    ('2026_08_25_000000_create_personal_access_tokens_table')
+    ('2026_08_25_000000_create_personal_access_tokens_table'),
+    ('2026_10_17_024940_create_clientes_table'),
+    ('2026_10_17_025856_add_cliente_id_to_vehiculos_table')
 ) AS seed(migration)
 WHERE NOT EXISTS (
     SELECT 1 FROM migrations WHERE migrations.migration = seed.migration
