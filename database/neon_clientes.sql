@@ -1,4 +1,4 @@
--- Alternativa manual al despliegue automatico: solo el modulo de clientes.
+-- Actualizacion manual en Neon: solo el modulo de clientes.
 -- Requiere la base existente creada con neon_schema_seed.sql.
 BEGIN;
 
