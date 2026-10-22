@@ -72,7 +72,15 @@ Con el despliegue automatico de la rama `main`, cada push aplica las migraciones
 
 Configura en Render la conexion a Neon (`DB_CONNECTION=pgsql`, las variables `DB_*` anteriores y `DB_SSLMODE=require`, o `DB_URL` con SSL). Si existe `DB_URL`, sus valores pueden prevalecer sobre las variables individuales. El `.env` local no se incluye en Docker. Deja **Docker Command** vacio para usar el `CMD` del Dockerfile.
 
-`ProductionSeeder` crea roles y permisos faltantes y agrega sus relaciones base sin quitar permisos adicionales. Conserva las descripciones existentes y no crea ni modifica usuarios, contraseñas o datos operativos/demo. Las relaciones base eliminadas se vuelven a agregar al desplegar. En una base nueva, el administrador inicial debe aprovisionarse por separado. No usar `migrate --seed` ni `db:seed` sin `--class=ProductionSeeder` en el despliegue: `DatabaseSeeder` carga usuarios y datos demo.
+`ProductionSeeder` ejecuta `DatabaseSeeder` dentro de una transaccion. Este llama, en orden, a `UsuariosSeeder` y `DatosSeeder`, incluyendo todos los datos iniciales actuales:
+
+- Roles, permisos y relaciones base, sin quitar permisos adicionales.
+- Cuentas `admin` y `mecanico` activas, y `suspendido` inactiva, con la contraseña inicial `12345678` definida por el seeder existente.
+- Propietario, vehiculo, mantenimiento, factura, repuesto, notificacion e historial de demostracion.
+
+Los seeders usan `firstOrCreate`: si un registro ya existe segun su clave de busqueda, conservan sus valores, contraseña, estado y fechas. Las relaciones base eliminadas se vuelven a agregar al desplegar. Si se elimina un registro inicial, se crea nuevamente en el siguiente arranque. El historial reconoce tambien la entrada equivalente creada por el SQL de Neon.
+
+Las claves de busqueda son username, nombre de rol/permiso, documento del propietario, placa, vehiculo y fecha de servicio, numero de factura, codigo de pieza, destinatario y asunto, y tipo/descripcion del historial. Editar una de estas claves puede hacer que se cree de nuevo el registro inicial; no son un historial de ejecuciones como las migraciones. Para nuevos seeders, agregarlos a `DatabaseSeeder` en orden de dependencias y mantener el comportamiento de insercion solo si faltan.
 
 #### Transicion desde los SQL manuales
 
@@ -88,6 +96,6 @@ WHERE table_schema = 'public' AND table_name = 'mantenimientos';
 
 Laravel usa el historial, no la existencia de una tabla, para decidir que ejecutar. Si se hicieron cambios manuales adicionales sin registrar su migracion, hay que verificar que coincidan completamente con ella y reconciliar el historial antes de automatizar. No se marcan migraciones como ejecutadas ni se ignoran errores automaticamente.
 
-Para cambios futuros, crear una migracion nueva; no editar una ya aplicada. Para nuevos datos base, ampliar `ProductionSeeder` manteniendo la insercion solo si faltan. No es necesario volver a ejecutar los SQL historicos.
+Para cambios futuros, crear una migracion nueva; no editar una ya aplicada. Para nuevos datos iniciales, ampliar los seeders llamados por `DatabaseSeeder` manteniendo la insercion solo si faltan. No es necesario volver a ejecutar los SQL historicos.
 
 Este arranque esta pensado para un unico contenedor web. Si se escala a varias instancias, centralizar las migraciones en un paso de despliegue o usar un bloqueo compartido para evitar ejecuciones simultaneas.

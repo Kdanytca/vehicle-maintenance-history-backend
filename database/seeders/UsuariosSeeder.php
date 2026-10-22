@@ -12,12 +12,12 @@ class UsuariosSeeder extends Seeder
 {
     public function run(): void
     {
-        $rolAdmin = Rol::updateOrCreate(
+        $rolAdmin = Rol::firstOrCreate(
             ['nombre_rol' => 'admin'],
             ['descripcion' => 'Administrador del sistema']
         );
 
-        $rolMecanico = Rol::updateOrCreate(
+        $rolMecanico = Rol::firstOrCreate(
             ['nombre_rol' => 'mecanico'],
             ['descripcion' => 'Mecánico del taller']
         );
@@ -28,13 +28,13 @@ class UsuariosSeeder extends Seeder
             ['nombre_permiso' => 'gestionar_vehiculos', 'descripcion' => 'Registrar y consultar vehículos'],
             ['nombre_permiso' => 'gestionar_mantenimientos', 'descripcion' => 'Registrar mantenimientos y consultar historial'],
             ['nombre_permiso' => 'gestionar_repuestos', 'descripcion' => 'Cargar facturas, repuestos y alertas'],
-        ])->map(fn ($permiso) => Permiso::updateOrCreate(
+        ])->map(fn ($permiso) => Permiso::firstOrCreate(
             ['nombre_permiso' => $permiso['nombre_permiso']],
             ['descripcion' => $permiso['descripcion']]
         ));
 
-        $rolAdmin->permisos()->sync($permisos->pluck('id_permiso'));
-        $rolMecanico->permisos()->sync(
+        $rolAdmin->permisos()->syncWithoutDetaching($permisos->pluck('id_permiso'));
+        $rolMecanico->permisos()->syncWithoutDetaching(
             $permisos
                 ->whereIn('nombre_permiso', [
                     'gestionar_vehiculos',
@@ -44,7 +44,7 @@ class UsuariosSeeder extends Seeder
                 ->pluck('id_permiso')
         );
 
-        Usuario::updateOrCreate([
+        Usuario::firstOrCreate([
             'username' => 'admin',
         ], [
             'password_hash' => Hash::make('12345678'),
@@ -52,7 +52,7 @@ class UsuariosSeeder extends Seeder
             'id_rol' => $rolAdmin->id_rol,
         ]);
 
-        Usuario::updateOrCreate([
+        Usuario::firstOrCreate([
             'username' => 'mecanico',
         ], [
             'password_hash' => Hash::make('12345678'),
@@ -60,7 +60,7 @@ class UsuariosSeeder extends Seeder
             'id_rol' => $rolMecanico->id_rol,
         ]);
 
-        Usuario::updateOrCreate([
+        Usuario::firstOrCreate([
             'username' => 'suspendido',
         ], [
             'password_hash' => Hash::make('12345678'),
