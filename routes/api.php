@@ -1,6 +1,8 @@
+
 <?php
 
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\EstadisticaController;
 use App\Http\Controllers\Api\HistorialVehiculoController;
 use App\Http\Controllers\Api\MantenimientoController;
 use App\Http\Controllers\Api\RepuestoController;
@@ -21,6 +23,9 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::apiResource('mantenimientos', MantenimientoController::class)->except(['show']);
     Route::get('/historial-vehiculo', HistorialVehiculoController::class);
+
+    // Estadísticas de mantenimiento
+    Route::get('/estadisticas/mantenimientos', [EstadisticaController::class, 'index']);
 
     Route::get('/repuestos', [RepuestoController::class, 'index']);
     Route::post('/repuestos/cargar-pdf', [RepuestoController::class, 'storeFromPdf']);

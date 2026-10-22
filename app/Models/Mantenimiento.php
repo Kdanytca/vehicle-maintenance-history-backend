@@ -14,6 +14,7 @@ class Mantenimiento extends Model
         'fecha_servicio',
         'descripcion_falla',
         'estado',
+        'tipo_servicio',
         'costo_mano_obra',
         'id_vehiculo',
         'id_usuario_encargado'

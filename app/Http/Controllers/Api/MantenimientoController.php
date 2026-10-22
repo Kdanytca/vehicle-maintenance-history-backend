@@ -15,7 +15,10 @@ class MantenimientoController extends Controller
     public function index(): JsonResponse
     {
         return response()->json([
-            'mantenimientos' => Mantenimiento::with(['vehiculo', 'encargado.rol'])
+            'mantenimientos' => Mantenimiento::with([
+                'vehiculo',
+                'encargado.rol'
+            ])
                 ->latest('id_mantenimiento')
                 ->get(),
             'vehiculos' => Vehiculo::all(),
@@ -35,8 +38,10 @@ class MantenimientoController extends Controller
         );
     }
 
-    public function update(Request $request, int $mantenimiento): JsonResponse
-    {
+    public function update(
+        Request $request,
+        int $mantenimiento
+    ): JsonResponse {
         $registro = Mantenimiento::findOrFail($mantenimiento);
 
         $datos = $this->validated(
@@ -68,6 +73,7 @@ class MantenimientoController extends Controller
     ): array {
         $datos = $request->validate([
             'fecha_servicio' => 'required|date',
+            'tipo_servicio' => 'nullable|string|max:100',
             'descripcion_falla' => 'required|string',
             'estado' => 'required|string',
             'costo_mano_obra' => 'nullable|numeric',
