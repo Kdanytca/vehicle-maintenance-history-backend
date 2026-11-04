@@ -13,14 +13,14 @@ class HistorialVehiculoController extends Controller
 {
     public function __invoke(Request $request): JsonResponse
     {
-        $vehiculos = Vehiculo::with('propietario')->get();
+        $vehiculos = Vehiculo::withTrashed()->with('propietario')->get();
         $vehiculo = null;
         $mantenimientos = [];
         $historial = [];
         $resumen = null;
 
         if ($request->filled('id_vehiculo')) {
-            $vehiculo = Vehiculo::with('propietario')->findOrFail($request->id_vehiculo);
+            $vehiculo = Vehiculo::withTrashed()->with('propietario')->findOrFail($request->id_vehiculo);
             $mantenimientos = Mantenimiento::with(['encargado.rol', 'repuestos'])
                 ->where('id_vehiculo', $vehiculo->id_vehiculo)
                 ->orderByDesc('fecha_servicio')

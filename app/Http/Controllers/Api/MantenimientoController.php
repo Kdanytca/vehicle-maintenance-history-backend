@@ -8,6 +8,8 @@ use App\Models\Usuario;
 use App\Models\Vehiculo;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class MantenimientoController extends Controller
@@ -28,9 +30,12 @@ class MantenimientoController extends Controller
 
     public function store(Request $request): JsonResponse
     {
-        $datos = $this->validated($request);
+        $mantenimiento = DB::transaction(function () use ($request) {
+            $datos = $this->validated($request);
+            $this->requireActiveVehicle((int) $datos['id_vehiculo']);
 
-        $mantenimiento = Mantenimiento::create($datos);
+            return Mantenimiento::create($datos);
+        });
 
         return response()->json(
             $mantenimiento->load(['vehiculo', 'encargado.rol']),
@@ -42,14 +47,19 @@ class MantenimientoController extends Controller
         Request $request,
         int $mantenimiento
     ): JsonResponse {
-        $registro = Mantenimiento::findOrFail($mantenimiento);
+        $registro = DB::transaction(function () use ($request, $mantenimiento) {
+            $registro = Mantenimiento::findOrFail($mantenimiento);
+            $datos = $this->validated($request, $registro->id_mantenimiento);
+            $ids = array_unique([(int) $registro->id_vehiculo, (int) $datos['id_vehiculo']]);
+            sort($ids);
+            foreach ($ids as $id) {
+                $this->requireActiveVehicle($id);
+            }
+            $registro = $this->reloadUnchangedJob($registro);
+            $registro->update($datos);
 
-        $datos = $this->validated(
-            $request,
-            $registro->id_mantenimiento
-        );
-
-        $registro->update($datos);
+            return $registro;
+        });
 
         return response()->json(
             $registro->load(['vehiculo', 'encargado.rol'])
@@ -58,11 +68,14 @@ class MantenimientoController extends Controller
 
     public function destroy(int $mantenimiento): JsonResponse
     {
-        $registro = Mantenimiento::findOrFail($mantenimiento);
+        $registro = DB::transaction(function () use ($mantenimiento) {
+            $registro = Mantenimiento::findOrFail($mantenimiento);
+            $this->requireActiveVehicle($registro->id_vehiculo);
+            $registro = $this->reloadUnchangedJob($registro);
+            $registro->update(['estado' => 'Cancelado']);
 
-        $registro->update([
-            'estado' => 'Cancelado',
-        ]);
+            return $registro;
+        });
 
         return response()->json($registro);
     }
@@ -77,7 +90,7 @@ class MantenimientoController extends Controller
             'descripcion_falla' => 'required|string',
             'estado' => 'required|string',
             'costo_mano_obra' => 'nullable|numeric',
-            'id_vehiculo' => 'required|exists:vehiculos,id_vehiculo',
+            'id_vehiculo' => ['required', Rule::exists('vehiculos', 'id_vehiculo')->whereNull('deleted_at')],
             'id_usuario_encargado' => 'required|exists:usuarios,id_usuario',
         ]);
 
@@ -114,5 +127,29 @@ class MantenimientoController extends Controller
         }
 
         return $datos;
+    }
+
+    private function requireActiveVehicle(int $id): void
+    {
+        // El mismo bloqueo que usa el archivo evita crear/reactivar trabajos durante la baja.
+        $vehiculo = Vehiculo::withTrashed()->lockForUpdate()->find($id);
+        if (! $vehiculo || $vehiculo->trashed()) {
+            throw ValidationException::withMessages([
+                'id_vehiculo' => 'El vehículo está archivado; sus mantenimientos se conservan solo para consulta.',
+            ]);
+        }
+    }
+
+    private function reloadUnchangedJob(Mantenimiento $registro): Mantenimiento
+    {
+        // Bloquear siempre vehículo antes que mantenimiento, igual que al archivar.
+        $actual = Mantenimiento::lockForUpdate()->findOrFail($registro->id_mantenimiento);
+        if ($actual->id_vehiculo !== $registro->id_vehiculo) {
+            throw ValidationException::withMessages([
+                'id_vehiculo' => 'El mantenimiento cambió de vehículo. Recarga los datos antes de continuar.',
+            ]);
+        }
+
+        return $actual;
     }
 }

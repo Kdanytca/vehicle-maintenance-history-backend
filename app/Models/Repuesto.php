@@ -17,7 +17,14 @@ class Repuesto extends Model
         'codigo_pieza',
         'costo_unitario',
         'id_mantenimiento',
-        'id_factura'
+        'id_factura',
+        'garantia_inicio',
+        'garantia_fin',
+    ];
+
+    protected $casts = [
+        'garantia_inicio' => 'date:Y-m-d',
+        'garantia_fin' => 'date:Y-m-d',
     ];
 
     public function mantenimiento()

@@ -10,6 +10,8 @@ use App\Models\Vehiculo;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 
 class RepuestoController extends Controller
 {
@@ -29,46 +31,54 @@ class RepuestoController extends Controller
     public function storeFromPdf(Request $request): JsonResponse
     {
         try {
-            $data = $request->validate([
-                'id_vehiculo' => 'required|exists:vehiculos,id_vehiculo',
-                'comprobante_pdf' => 'required|mimes:pdf|max:5120',
-                'cantidad_recibida' => 'required|integer|min:1',
-                'costo_unitario' => 'required|numeric|min:0',
-            ]);
+            return DB::transaction(function () use ($request): JsonResponse {
+                $data = $request->validate([
+                    'id_vehiculo' => ['required', Rule::exists('vehiculos', 'id_vehiculo')->whereNull('deleted_at')],
+                    'comprobante_pdf' => 'required|mimes:pdf|max:5120',
+                    'cantidad_recibida' => 'required|integer|min:1',
+                    'costo_unitario' => 'required|numeric|min:0',
+                    'garantia_inicio' => 'nullable|required_with:garantia_fin|date_format:Y-m-d',
+                    'garantia_fin' => 'nullable|required_with:garantia_inicio|date_format:Y-m-d|after_or_equal:garantia_inicio',
+                ]);
 
-            $file = $request->file('comprobante_pdf');
-            $path = $file->store('facturas', 'public');
-            $raw = file_get_contents(Storage::disk('public')->path($path));
+                Vehiculo::lockForUpdate()->findOrFail($data['id_vehiculo']);
 
-            preg_match_all('/\((.*?)\)/', $raw, $matches);
-            $text = trim(implode(' ', $matches[1])) ?: 'FACTURA COMPROBANTE ' . $file->getClientOriginalName();
+                $file = $request->file('comprobante_pdf');
+                $path = $file->store('facturas', 'public');
+                $raw = file_get_contents(Storage::disk('public')->path($path));
 
-            preg_match('/FAC-\d+/', $text, $facturaMatch);
-            preg_match('/REP-\d+-[A-Z]/', $text, $codigoMatch);
-            preg_match('/(?:codigoPieza|Código Pieza|Codigo Pieza)\s*[:\-]?\s*([^\t\n]+)/i', $text, $piezaCodigoMatch);
-            preg_match('/Filtro de Aceite [^\n]+|Pastillas de Freno [^\n]+|Cambio de Aceite [^\n]+/i', $text, $piezaMatch);
+                preg_match_all('/\((.*?)\)/', $raw, $matches);
+                $text = trim(implode(' ', $matches[1])) ?: 'FACTURA COMPROBANTE ' . $file->getClientOriginalName();
 
-            $factura = Factura::create([
-                'numero_factura' => $facturaMatch[0] ?? 'FAC-INDETERMINADO',
-                'fecha_emision' => now()->format('Y-m-d'),
-                'monto_total' => $data['costo_unitario'] * $data['cantidad_recibida'],
-                'ruta_pdf_almacenamiento' => $path,
-                'id_vehiculo' => $data['id_vehiculo'],
-            ]);
+                preg_match('/FAC-\d+/', $text, $facturaMatch);
+                preg_match('/REP-\d+-[A-Z]/', $text, $codigoMatch);
+                preg_match('/(?:codigoPieza|Código Pieza|Codigo Pieza)\s*[:\-]?\s*([^\t\n]+)/i', $text, $piezaCodigoMatch);
+                preg_match('/Filtro de Aceite [^\n]+|Pastillas de Freno [^\n]+|Cambio de Aceite [^\n]+/i', $text, $piezaMatch);
 
-            $repuesto = Repuesto::create([
-                'nombre_pieza' => trim($piezaMatch[0] ?? $piezaCodigoMatch[1] ?? 'Pieza Automotriz No Identificada'),
-                'codigo_pieza' => $codigoMatch[0] ?? 'REP-GENERICO',
-                'costo_unitario' => $data['costo_unitario'],
-                'id_factura' => $factura->id_factura,
-            ]);
+                $factura = Factura::create([
+                    'numero_factura' => $facturaMatch[0] ?? 'FAC-INDETERMINADO',
+                    'fecha_emision' => now()->format('Y-m-d'),
+                    'monto_total' => $data['costo_unitario'] * $data['cantidad_recibida'],
+                    'ruta_pdf_almacenamiento' => $path,
+                    'id_vehiculo' => $data['id_vehiculo'],
+                ]);
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Factura procesada y repuesto vinculado correctamente.',
-                'data' => $repuesto->load('factura.vehiculo'),
-                'ruta_pdf' => Storage::disk('public')->url($path),
-            ], 201);
+                $repuesto = Repuesto::create([
+                    'nombre_pieza' => trim($piezaMatch[0] ?? $piezaCodigoMatch[1] ?? 'Pieza Automotriz No Identificada'),
+                    'codigo_pieza' => $codigoMatch[0] ?? 'REP-GENERICO',
+                    'costo_unitario' => $data['costo_unitario'],
+                    'id_factura' => $factura->id_factura,
+                    'garantia_inicio' => $data['garantia_inicio'] ?? null,
+                    'garantia_fin' => $data['garantia_fin'] ?? null,
+                ]);
+
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Factura procesada y repuesto vinculado correctamente.',
+                    'data' => $repuesto->load('factura.vehiculo'),
+                    'ruta_pdf' => Storage::disk('public')->url($path),
+                ], 201);
+            });
         } catch (\Throwable $exception) {
             return response()->json([
                 'success' => false,

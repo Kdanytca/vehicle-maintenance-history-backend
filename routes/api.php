@@ -1,6 +1,8 @@
 <?php
 
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\AlertaGarantiaController;
+use App\Http\Controllers\Api\ReportePdfController;
 use App\Http\Controllers\Api\EstadisticaController;
 use App\Http\Controllers\Api\HistorialVehiculoController;
 use App\Http\Controllers\Api\MantenimientoController;
@@ -19,6 +21,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('vehiculos', VehiculoController::class);
     Route::get('/vehiculos-buscar', [VehiculoController::class, 'buscar']);
     Route::get('/reportes/placa', [VehiculoController::class, 'reportePorPlaca']);
+    Route::get('/reportes/placa/pdf', ReportePdfController::class)->middleware('solo.admin');
 
     Route::apiResource('mantenimientos', MantenimientoController::class)->except(['show']);
     Route::get('/historial-vehiculo', HistorialVehiculoController::class);
@@ -29,6 +32,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/repuestos', [RepuestoController::class, 'index']);
     Route::post('/repuestos/cargar-pdf', [RepuestoController::class, 'storeFromPdf']);
     Route::get('/alertas', [RepuestoController::class, 'alertas']);
+    Route::get('/alertas-garantia', [AlertaGarantiaController::class, 'index']);
+    Route::patch('/alertas-garantia/{alerta}/atender', [AlertaGarantiaController::class, 'atender'])->middleware('solo.admin');
     Route::post('/notificaciones/enviar', [RepuestoController::class, 'enviarNotificacion']);
 
     Route::middleware('solo.admin')->group(function () {
