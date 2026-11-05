@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\AuditLog;
 use App\Models\Factura;
 use App\Models\HistorialCambio;
 use App\Models\Mantenimiento;
@@ -31,7 +32,7 @@ class VehiculoController extends Controller
             'unique:vehiculos,placa',
     ],
     'marca' => 'required|string|max:100',
-    'modelo' => 'required|string|max:100',
+    'modelo' => 'required|string|max:6',
     'anio' => 'required|integer|min:1900|max:' . (now()->year + 1),
     'propietario' => 'required|string|max:150',
         ]);
@@ -50,6 +51,12 @@ class VehiculoController extends Controller
             'anio' => $data['anio'],
             'id_propietario' => $propietario->id_propietario,
         ]);
+
+        AuditLog::registrar(
+            'crear',
+            'vehiculos',
+            'Se creó el vehículo '.$vehiculo->placa.' para el propietario '.$propietario->nombre
+        );
 
         return response()->json($vehiculo->load('propietario'), 201);
     }
@@ -76,13 +83,19 @@ class VehiculoController extends Controller
                     'unique:vehiculos,placa,' . $vehiculo->id_vehiculo . ',id_vehiculo',
                 ],
                 'marca' => 'required|string|max:100',
-                'modelo' => 'required|string|max:100',
+                'modelo' => 'required|string|max:6',
                 'anio' => 'required|integer|min:1900|max:' . (now()->year + 1),
                 'propietario' => 'required|string|max:150',
             ]);
 
             $vehiculo->update($request->only('placa', 'marca', 'modelo', 'anio'));
             $vehiculo->propietario?->update(['nombre' => $data['propietario']]);
+
+            AuditLog::registrar(
+                'editar',
+                'vehiculos',
+                'Se actualizó el vehículo '.$vehiculo->placa.' (marca: '.$vehiculo->marca.', modelo: '.$vehiculo->modelo.')'
+            );
 
             return response()->json($vehiculo->refresh()->load('propietario'));
         });

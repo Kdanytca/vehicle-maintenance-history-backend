@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\AuditLog;
 use App\Models\Mantenimiento;
 use App\Models\Usuario;
 use App\Models\Vehiculo;
@@ -14,15 +15,42 @@ use Illuminate\Validation\ValidationException;
 
 class MantenimientoController extends Controller
 {
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
+        $request->validate([
+            'fecha_inicio' => ['nullable', 'date_format:Y-m-d'],
+            'fecha_fin' => ['nullable', 'date_format:Y-m-d'],
+        ]);
+
+        if (
+            $request->filled('fecha_inicio') &&
+            $request->filled('fecha_fin') &&
+            $request->date('fecha_inicio')->greaterThan($request->date('fecha_fin'))
+        ) {
+            throw ValidationException::withMessages([
+                'fecha_fin' => ['La fecha final debe ser mayor o igual que la fecha de inicio.'],
+            ]);
+        }
+
+        $query = Mantenimiento::with([
+            'vehiculo',
+            'encargado.rol',
+        ])
+            ->orderByDesc('id_mantenimiento');
+
+        if ($request->filled('fecha_inicio') && $request->filled('fecha_fin')) {
+            $query->whereBetween('fecha_servicio', [
+                $request->input('fecha_inicio'),
+                $request->input('fecha_fin'),
+            ]);
+        } elseif ($request->filled('fecha_inicio')) {
+            $query->whereDate('fecha_servicio', '>=', $request->input('fecha_inicio'));
+        } elseif ($request->filled('fecha_fin')) {
+            $query->whereDate('fecha_servicio', '<=', $request->input('fecha_fin'));
+        }
+
         return response()->json([
-            'mantenimientos' => Mantenimiento::with([
-                'vehiculo',
-                'encargado.rol'
-            ])
-                ->latest('id_mantenimiento')
-                ->get(),
+            'mantenimientos' => $query->get(),
             'vehiculos' => Vehiculo::all(),
             'usuarios' => Usuario::with('rol')->get(),
         ]);
@@ -36,6 +64,12 @@ class MantenimientoController extends Controller
 
             return Mantenimiento::create($datos);
         });
+
+        AuditLog::registrar(
+            'crear',
+            'mantenimientos',
+            'Se creó el mantenimiento #'.$mantenimiento->id_mantenimiento.' para el vehículo '.$mantenimiento->id_vehiculo
+        );
 
         return response()->json(
             $mantenimiento->load(['vehiculo', 'encargado.rol']),
@@ -61,6 +95,12 @@ class MantenimientoController extends Controller
             return $registro;
         });
 
+        AuditLog::registrar(
+            'editar',
+            'mantenimientos',
+            'Se actualizó el mantenimiento #'.$registro->id_mantenimiento.' con Estado: '.$registro->estado
+        );
+
         return response()->json(
             $registro->load(['vehiculo', 'encargado.rol'])
         );
@@ -76,6 +116,12 @@ class MantenimientoController extends Controller
 
             return $registro;
         });
+
+        AuditLog::registrar(
+            'eliminar',
+            'mantenimientos',
+            'Se canceló el mantenimiento #'.$registro->id_mantenimiento.' y quedó en estado Cancelado.'
+        );
 
         return response()->json($registro);
     }

@@ -26,7 +26,8 @@ class EstadisticaController extends Controller
                 'vehiculos.placa',
                 'vehiculos.marca',
                 'vehiculos.modelo',
-                DB::raw('COUNT(mantenimientos.id_mantenimiento) as total_servicios')
+                DB::raw('COUNT(mantenimientos.id_mantenimiento) as total_servicios'),
+                DB::raw('COUNT(mantenimientos.id_mantenimiento) * 10 as total_servicios_x_10')
             )
             ->whereNotNull('mantenimientos.id_vehiculo')
             ->groupBy(

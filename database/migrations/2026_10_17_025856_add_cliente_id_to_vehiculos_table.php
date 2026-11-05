@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::table('vehiculos', function (Blueprint $table) {
             $table->foreignId('cliente_id')
                 ->nullable()
-                ->after('id')
+                ->after('id_vehiculo')
                 ->constrained('clientes')
                 ->cascadeOnDelete();
         });

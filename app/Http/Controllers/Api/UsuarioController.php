@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\AuditLog;
 use App\Models\Rol;
 use App\Models\Usuario;
 use Illuminate\Http\JsonResponse;
@@ -36,6 +37,12 @@ class UsuarioController extends Controller
             'id_rol' => $data['id_rol'],
         ]);
 
+        AuditLog::registrar(
+            'crear',
+            'usuarios',
+            'Se creó el usuario '.$usuario->username.'.'
+        );
+
         return response()->json($usuario->load('rol'), 201);
     }
 
@@ -57,6 +64,12 @@ class UsuarioController extends Controller
 
         $usuario->save();
 
+        AuditLog::registrar(
+            'editar',
+            'usuarios',
+            'Se actualizó el usuario '.$usuario->username.'.'
+        );
+
         return response()->json($usuario->load('rol'));
     }
 
@@ -69,6 +82,12 @@ class UsuarioController extends Controller
         }
 
         $usuario->update(['estado_activo' => false]);
+
+        AuditLog::registrar(
+            'eliminar',
+            'usuarios',
+            'Se inhabilitó el usuario '.$usuario->username.'.'
+        );
 
         return response()->json($usuario->load('rol'));
     }
