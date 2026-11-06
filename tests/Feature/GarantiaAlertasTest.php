@@ -105,13 +105,52 @@ class GarantiaAlertasTest extends TestCase
     {
         Storage::fake('public');
         $data = ['id_vehiculo' => Vehiculo::firstOrFail()->id_vehiculo, 'cantidad_recibida' => 1,
-            'costo_unitario' => 10, 'comprobante_pdf' => UploadedFile::fake()->create('factura.pdf', 10, 'application/pdf'),
+            'costo_unitario' => 10, 'comprobante_pdf' => UploadedFile::fake()->createWithContent('factura.pdf', "%PDF-1.4\n(FAC-123)\n%%EOF"),
             'garantia_inicio' => '2026-01-01', 'garantia_fin' => '2026-11-05'];
         $this->postJson('/api/repuestos/cargar-pdf', $data)->assertCreated()
             ->assertJsonPath('data.garantia_fin', '2026-11-05');
         $this->postJson('/api/repuestos/cargar-pdf', array_replace($data, ['garantia_fin' => '2025-01-01']))->assertUnprocessable();
         $this->postJson('/api/repuestos/cargar-pdf', array_replace($data, ['garantia_fin' => null]))->assertUnprocessable();
-        $this->postJson('/api/repuestos/cargar-pdf', array_replace($data, ['garantia_inicio' => null, 'garantia_fin' => null]))->assertCreated();
+        $this->postJson('/api/repuestos/cargar-pdf', array_replace($data, [
+            'comprobante_pdf' => UploadedFile::fake()->createWithContent('factura-sin-garantia.pdf', "%PDF-1.4\n(FAC-124)\n%%EOF"),
+            'garantia_inicio' => null,
+            'garantia_fin' => null,
+        ]))->assertCreated();
+    }
+
+    public function test_duplicate_invoice_number_is_rejected_before_saving_file_or_records(): void
+    {
+        Storage::fake('public');
+        $data = [
+            'id_vehiculo' => Vehiculo::firstOrFail()->id_vehiculo,
+            'cantidad_recibida' => 1,
+            'costo_unitario' => 10,
+            'comprobante_pdf' => UploadedFile::fake()->createWithContent('factura.pdf', "%PDF-1.4\n(FAC-456)\n%%EOF"),
+        ];
+
+        $this->postJson('/api/repuestos/cargar-pdf', $data)->assertCreated();
+        $this->postJson('/api/repuestos/cargar-pdf', array_replace($data, [
+            'comprobante_pdf' => UploadedFile::fake()->createWithContent('factura-duplicada.pdf', "%PDF-1.4\n(FAC-456)\n%%EOF"),
+        ]))
+            ->assertUnprocessable()
+            ->assertJsonPath('message', 'El número de factura FAC-456 ya fue registrado previamente.')
+            ->assertJsonValidationErrors('numero_factura');
+
+        $this->assertDatabaseCount('facturas', 2);
+        $this->assertDatabaseCount('repuestos', 2);
+        $this->assertCount(1, Storage::disk('public')->allFiles('facturas'));
+    }
+
+    public function test_invoice_number_can_be_provided_when_pdf_text_cannot_be_extracted(): void
+    {
+        Storage::fake('public');
+        $this->postJson('/api/repuestos/cargar-pdf', [
+            'id_vehiculo' => Vehiculo::firstOrFail()->id_vehiculo,
+            'cantidad_recibida' => 1,
+            'costo_unitario' => 10,
+            'numero_factura' => 'fac-manual-001',
+            'comprobante_pdf' => UploadedFile::fake()->create('factura.pdf', 10, 'application/pdf'),
+        ])->assertCreated()->assertJsonPath('data.factura.numero_factura', 'FAC-MANUAL-001');
     }
 
     public function test_command_generates_alerts_and_guest_cannot_access_them(): void

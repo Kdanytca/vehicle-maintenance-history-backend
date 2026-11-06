@@ -44,6 +44,10 @@ La pantalla de Alertas guarda el cambio al modificar el campo. La generacion de 
 
 `GET /api/audit-logs` permite a administradores consultar los accesos y actividades del sistema. Admite filtros opcionales `usuario` (coincidencia parcial), `rol` (nombre exacto) y `fecha` (`YYYY-MM-DD`, interpretada en `zona_horaria` cuando se envía). Los intentos de inicio de sesion se almacenan con el nombre y rol disponibles, y se distinguen como `exitoso` o `fallido`. El endpoint es de solo lectura.
 
+## Unicidad de facturas
+
+Al cargar un PDF, el sistema compara el número de factura ingresado o detectado en el documento antes de guardar el archivo y sus registros. Si no puede detectar el número, se puede ingresar en el formulario. La base de datos también aplica una restricción única para evitar duplicados en cargas simultáneas.
+
 Variables importantes para despliegue:
 
 ```env
