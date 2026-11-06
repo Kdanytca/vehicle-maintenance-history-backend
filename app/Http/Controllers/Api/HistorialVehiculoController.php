@@ -21,7 +21,7 @@ class HistorialVehiculoController extends Controller
 
         if ($request->filled('id_vehiculo')) {
             $vehiculo = Vehiculo::withTrashed()->with('propietario')->findOrFail($request->id_vehiculo);
-            $mantenimientos = Mantenimiento::with(['encargado.rol', 'repuestos'])
+            $mantenimientos = Mantenimiento::with(['encargado.rol', 'repuestos.factura'])
                 ->where('id_vehiculo', $vehiculo->id_vehiculo)
                 ->orderByDesc('fecha_servicio')
                 ->get()
