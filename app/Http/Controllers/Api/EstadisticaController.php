@@ -40,9 +40,19 @@ class EstadisticaController extends Controller
             ->limit(5)
             ->get();
 
-        return response()->json([
+        $respuesta = [
             'total_mantenimientos' => $totalMantenimientos,
             'vehiculos_con_mas_servicios' => $vehiculosConMasServicios,
-        ]);
+        ];
+
+        // Ganancias: solo servicios Completados y solo visibles para administradores.
+        if (auth()->user()?->rol?->nombre_rol === 'admin') {
+            $respuesta['ganancias_totales'] = round(
+                (float) Mantenimiento::where('estado', 'Completado')->sum('costo_mano_obra'),
+                2
+            );
+        }
+
+        return response()->json($respuesta);
     }
 }
