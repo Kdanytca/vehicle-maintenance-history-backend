@@ -23,6 +23,9 @@ class AuditLog extends Model
         'accion',
         'modulo',
         'descripcion',
+        'usuario_nombre',
+        'rol_nombre',
+        'tipo_acceso',
     ];
 
     /**
@@ -45,9 +48,9 @@ class AuditLog extends Model
     /**
      * Registra un cambio del sistema de forma consistente.
      *
-     * @param string $accion   Ejemplo: crear, actualizar, eliminar
-     * @param string $modulo   Ejemplo: mantenimientos, usuarios, clientes
-     * @param string|null $descripcion Texto detallado del cambio
+     * @param  string  $accion  Ejemplo: crear, actualizar, eliminar
+     * @param  string  $modulo  Ejemplo: mantenimientos, usuarios, clientes
+     * @param  string|null  $descripcion  Texto detallado del cambio
      */
     public static function registrar(string $accion, string $modulo, ?string $descripcion = null): void
     {
@@ -58,6 +61,23 @@ class AuditLog extends Model
             'accion' => $accion,
             'modulo' => $modulo,
             'descripcion' => $descripcion,
+            'usuario_nombre' => $usuarioActual?->username,
+            'rol_nombre' => $usuarioActual?->rol?->nombre_rol,
+        ]);
+    }
+
+    public static function registrarAcceso(?string $username, ?Usuario $usuario, string $tipoAcceso): void
+    {
+        self::create([
+            'user_id' => $usuario?->id_usuario,
+            'usuario_nombre' => $username,
+            'rol_nombre' => $usuario?->rol?->nombre_rol,
+            'tipo_acceso' => $tipoAcceso,
+            'accion' => 'inicio_sesion',
+            'modulo' => 'autenticacion',
+            'descripcion' => $tipoAcceso === 'exitoso'
+                ? 'Inicio de sesión exitoso.'
+                : 'Inicio de sesión fallido.',
         ]);
     }
 }

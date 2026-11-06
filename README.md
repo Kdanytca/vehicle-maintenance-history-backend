@@ -40,6 +40,10 @@ El umbral de anticipacion inicia en 15 dias y puede consultarse o modificarse po
 
 La pantalla de Alertas guarda el cambio al modificar el campo. La generacion de alertas usa el umbral vigente.
 
+## Auditoria de accesos y actividades
+
+`GET /api/audit-logs` permite a administradores consultar los accesos y actividades del sistema. Admite filtros opcionales `usuario` (coincidencia parcial), `rol` (nombre exacto) y `fecha` (`YYYY-MM-DD`, interpretada en `zona_horaria` cuando se envía). Los intentos de inicio de sesion se almacenan con el nombre y rol disponibles, y se distinguen como `exitoso` o `fallido`. El endpoint es de solo lectura.
+
 Variables importantes para despliegue:
 
 ```env
