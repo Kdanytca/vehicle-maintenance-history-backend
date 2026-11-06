@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Configuracion;
 use App\Models\Repuesto;
 use App\Models\Usuario;
 use App\Models\Vehiculo;
@@ -26,7 +27,7 @@ class GarantiaAlertasTest extends TestCase
 
     public function test_generates_only_due_alerts_without_duplicates(): void
     {
-        foreach (['2026-11-03', '2026-11-04', '2026-12-04', '2026-12-05'] as $fin) {
+        foreach (['2026-11-03', '2026-11-04', '2026-11-19', '2026-11-20'] as $fin) {
             Repuesto::create(['nombre_pieza' => 'Filtro', 'costo_unitario' => 10,
                 'garantia_inicio' => '2026-01-01', 'garantia_fin' => $fin]);
         }
@@ -35,7 +36,35 @@ class GarantiaAlertasTest extends TestCase
         $this->getJson('/api/alertas-garantia')->assertOk()->assertJsonCount(3);
         $this->getJson('/api/alertas-garantia')->assertOk()->assertJsonCount(3);
         $this->assertDatabaseCount('alertas_garantia', 3);
-        $this->assertDatabaseHas('alertas_garantia', ['tipo' => 'por_vencer', 'fecha_vencimiento' => '2026-12-04']);
+        $this->assertDatabaseHas('alertas_garantia', ['tipo' => 'por_vencer', 'fecha_vencimiento' => '2026-11-19']);
+    }
+
+    public function test_alert_threshold_defaults_to_15_days_and_can_be_updated(): void
+    {
+        Configuracion::where('clave', Configuracion::CLAVE_DIAS_ALERTA_GARANTIA)->delete();
+        $this->getJson('/api/configuracion-alertas-garantia')->assertOk()
+            ->assertJsonPath('dias_previos', 15);
+        $this->assertDatabaseHas('configuraciones', ['clave' => 'dias_alerta_garantia', 'valor' => 15]);
+
+        $this->putJson('/api/configuracion-alertas-garantia', ['dias_previos' => 0])->assertUnprocessable();
+        $this->putJson('/api/configuracion-alertas-garantia', ['dias_previos' => 8])->assertOk()
+            ->assertJsonPath('dias_previos', 8);
+        $this->getJson('/api/configuracion-alertas-garantia')->assertOk()
+            ->assertJsonPath('dias_previos', 8);
+    }
+
+    public function test_alert_generation_uses_the_configured_threshold(): void
+    {
+        foreach (['2026-11-09', '2026-11-10'] as $fin) {
+            Repuesto::create(['nombre_pieza' => 'Filtro', 'costo_unitario' => 10,
+                'garantia_inicio' => '2026-01-01', 'garantia_fin' => $fin]);
+        }
+
+        $this->getJson('/api/alertas-garantia')->assertOk()->assertJsonCount(2);
+        $this->putJson('/api/configuracion-alertas-garantia', ['dias_previos' => 5])->assertOk();
+        $this->getJson('/api/alertas-garantia')->assertOk()->assertJsonCount(1)
+            ->assertJsonPath('0.fecha_vencimiento', '2026-11-09');
+        $this->assertDatabaseCount('alertas_garantia', 1);
     }
 
     public function test_attention_is_persistent_audited_and_idempotent_and_expiry_is_a_new_alert(): void
@@ -61,6 +90,15 @@ class GarantiaAlertasTest extends TestCase
         Sanctum::actingAs(Usuario::whereHas('rol', fn ($q) => $q->where('nombre_rol', 'mecanico'))->firstOrFail());
         $this->patchJson("/api/alertas-garantia/$id/atender")->assertForbidden();
         $this->assertDatabaseHas('alertas_garantia', ['id' => $id, 'atendida_at' => null]);
+    }
+
+    public function test_only_admin_can_view_or_update_warranty_alert_configuration(): void
+    {
+        Sanctum::actingAs(Usuario::whereHas('rol', fn ($q) => $q->where('nombre_rol', 'mecanico'))->firstOrFail());
+
+        $this->getJson('/api/configuracion-alertas-garantia')->assertForbidden();
+        $this->putJson('/api/configuracion-alertas-garantia', ['dias_previos' => 7])->assertForbidden();
+        $this->assertDatabaseHas('configuraciones', ['clave' => 'dias_alerta_garantia', 'valor' => 15]);
     }
 
     public function test_upload_persists_warranty_and_rejects_invalid_or_incomplete_dates(): void

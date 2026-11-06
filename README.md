@@ -31,6 +31,15 @@ El frontend usa tokens Bearer de Laravel Sanctum:
 
 Configura CORS/URL del frontend segun el dominio donde corra Vue.
 
+## Alertas de garantia
+
+El umbral de anticipacion inicia en 15 dias y puede consultarse o modificarse por un administrador autenticado:
+
+- `GET /api/configuracion-alertas-garantia`
+- `PUT /api/configuracion-alertas-garantia` con `{"dias_previos": 15}` (acepta enteros mayores que cero).
+
+La pantalla de Alertas guarda el cambio al modificar el campo. La generacion de alertas usa el umbral vigente.
+
 Variables importantes para despliegue:
 
 ```env

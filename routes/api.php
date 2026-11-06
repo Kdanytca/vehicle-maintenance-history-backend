@@ -1,12 +1,13 @@
 <?php
 
+use App\Http\Controllers\Api\AlertaGarantiaController;
 use App\Http\Controllers\Api\AuditLogController;
 use App\Http\Controllers\Api\AuthController;
-use App\Http\Controllers\Api\AlertaGarantiaController;
-use App\Http\Controllers\Api\ReportePdfController;
+use App\Http\Controllers\Api\ConfiguracionAlertaGarantiaController;
 use App\Http\Controllers\Api\EstadisticaController;
 use App\Http\Controllers\Api\HistorialVehiculoController;
 use App\Http\Controllers\Api\MantenimientoController;
+use App\Http\Controllers\Api\ReportePdfController;
 use App\Http\Controllers\Api\RepuestoController;
 use App\Http\Controllers\Api\RolPermisoController;
 use App\Http\Controllers\Api\UsuarioController;
@@ -38,6 +39,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/notificaciones/enviar', [RepuestoController::class, 'enviarNotificacion']);
 
     Route::middleware('solo.admin')->group(function () {
+        Route::get('/configuracion-alertas-garantia', [ConfiguracionAlertaGarantiaController::class, 'show']);
+        Route::put('/configuracion-alertas-garantia', [ConfiguracionAlertaGarantiaController::class, 'update']);
         Route::get('/audit-logs', [AuditLogController::class, 'index']);
         Route::apiResource('usuarios', UsuarioController::class)->except(['show']);
         Route::get('/roles-permisos', [RolPermisoController::class, 'index']);
