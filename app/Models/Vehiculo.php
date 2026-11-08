@@ -41,6 +41,11 @@ class Vehiculo extends Model
     {
         return $this->hasMany(Mantenimiento::class, 'id_vehiculo', 'id_vehiculo');
     }
+    // recepciones (estado en que llegó el vehículo cada vez)
+    public function recepciones()
+    {
+        return $this->hasMany(Recepcion::class, 'id_vehiculo', 'id_vehiculo');
+    }
 
     public function facturas()
     {

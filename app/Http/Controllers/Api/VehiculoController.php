@@ -18,47 +18,57 @@ class VehiculoController extends Controller
 {
     public function index(): JsonResponse
     {
-        return response()->json(Vehiculo::with('propietario')->latest('id_vehiculo')->get());
+        return response()->json(
+            Vehiculo::with('propietario')->withCount('recepciones')->latest('id_vehiculo')->get()
+        );
     }
 
     public function store(Request $request): JsonResponse
     {
         $data = $request->validate([
             'placa' => [
-            'required',
-            'string',
-            'max:10',
-            'regex:/^(P|A|C|M|D|T|RE|AB|MI|CC|CD|N|V)[0-9]{3}-[0-9]{3}$/i',
-            'unique:vehiculos,placa',
-    ],
-    'marca' => 'required|string|max:100',
-    'modelo' => 'required|string|max:6',
-    'anio' => 'required|integer|min:1900|max:' . (now()->year + 1),
-    'propietario' => 'required|string|max:150',
-        ]);
+                'required',
+                'string',
+                'max:10',
+                'regex:/^(P|A|C|M|D|T|RE|AB|MI|CC|CD|N|V)[0-9]{3}-[0-9]{3}$/i',
+                'unique:vehiculos,placa',
+            ],
+            'marca' => 'required|string|max:100',
+            'modelo' => 'required|string|max:6',
+            'anio' => 'required|integer|min:1900|max:' . (now()->year + 1),
+            'propietario' => 'required|string|max:150',
+        ] + RecepcionController::reglas(false)); // G2DS-16: campos de recepción
 
-        $propietario = Propietario::create([
-            'nombre' => $data['propietario'],
-            'documento_identidad' => null,
-            'telefono' => null,
-            'correo' => null,
-        ]);
+        // Si algo falla, no se guarda ni el vehículo ni la recepción.
+        return DB::transaction(function () use ($request, $data): JsonResponse {
+            $propietario = Propietario::create([
+                'nombre' => $data['propietario'],
+                'documento_identidad' => null,
+                'telefono' => null,
+                'correo' => null,
+            ]);
 
-        $vehiculo = Vehiculo::create([
-            'placa' => $data['placa'],
-            'marca' => $data['marca'],
-            'modelo' => $data['modelo'],
-            'anio' => $data['anio'],
-            'id_propietario' => $propietario->id_propietario,
-        ]);
+            $vehiculo = Vehiculo::create([
+                'placa' => $data['placa'],
+                'marca' => $data['marca'],
+                'modelo' => $data['modelo'],
+                'anio' => $data['anio'],
+                'id_propietario' => $propietario->id_propietario,
+            ]);
 
-        AuditLog::registrar(
-            'crear',
-            'vehiculos',
-            'Se creó el vehículo '.$vehiculo->placa.' para el propietario '.$propietario->nombre
-        );
+            AuditLog::registrar(
+                'crear',
+                'vehiculos',
+                'Se creó el vehículo '.$vehiculo->placa.' para el propietario '.$propietario->nombre
+            );
 
-        return response()->json($vehiculo->load('propietario'), 201);
+            // G2DS-16: si se enviaron los datos de recepción, se guardan junto con el vehículo.
+            if ($request->filled('kilometraje')) {
+                RecepcionController::registrar($vehiculo, $data, $request->user()?->id_usuario);
+            }
+
+            return response()->json($vehiculo->load('propietario')->loadCount('recepciones'), 201);
+        });
     }
 
     public function show(int $vehiculo): JsonResponse

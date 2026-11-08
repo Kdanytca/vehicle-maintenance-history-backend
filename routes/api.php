@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\EstadisticaController;
 use App\Http\Controllers\Api\HistorialVehiculoController;
 use App\Http\Controllers\Api\MantenimientoController;
 use App\Http\Controllers\Api\NotificacionController;
+use App\Http\Controllers\Api\RecepcionController;
 use App\Http\Controllers\Api\ReportePdfController;
 use App\Http\Controllers\Api\RepuestoController;
 use App\Http\Controllers\Api\RolPermisoController;
@@ -30,6 +31,13 @@ Route::middleware('auth:sanctum')->group(function () {
     // Vehículos
     Route::apiResource('vehiculos', VehiculoController::class);
     Route::get('/vehiculos-buscar', [VehiculoController::class, 'buscar']);
+
+    // G2DS-16: recepción del vehículo
+    Route::get('/vehiculos/{vehiculo}/recepciones', [RecepcionController::class, 'index']);
+    Route::post('/vehiculos/{vehiculo}/recepciones', [RecepcionController::class, 'store']);
+    Route::put('/vehiculos/{vehiculo}/recepciones/{recepcion}', [RecepcionController::class, 'update'])
+        ->middleware('solo.admin');
+
     Route::get('/reportes/placa', [VehiculoController::class, 'reportePorPlaca']);
     Route::get('/reportes/placa/pdf', ReportePdfController::class)
         ->middleware('solo.admin');
