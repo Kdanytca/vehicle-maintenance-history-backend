@@ -17,10 +17,29 @@ use Illuminate\Validation\Rule;
 
 class RepuestoController extends Controller
 {
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
+        $query = Repuesto::with(['factura.vehiculo', 'mantenimiento.vehiculo'])->latest('id_repuesto');
+
+        $filtroRaw = (string) $request->input('garantia', $request->input('estado_garantia', $request->input('estado', '')));
+        $filtro = strtolower(trim($filtroRaw));
+        $filtro = str_replace(['á', 'é', 'í', 'ó', 'ú'], ['a', 'e', 'i', 'o', 'u'], $filtro);
+
+        $filtroAplicado = 'todos';
+        if (str_contains($filtro, 'vigente')) {
+            $query->garantiaVigente();
+            $filtroAplicado = 'vigente';
+        } elseif (str_contains($filtro, 'vencid')) {
+            $query->garantiaVencida();
+            $filtroAplicado = 'vencida';
+        }
+
+        $repuestos = $query->get();
+
         return response()->json([
-            'repuestos' => Repuesto::with('factura.vehiculo')->latest('id_repuesto')->get(),
+            'repuestos' => $repuestos,
+            'filtro_garantia' => $filtroAplicado,
+            'total' => $repuestos->count(),
             'vehiculos' => Vehiculo::all(),
             'mantenimientos' => Mantenimiento::where('estado', '!=', 'Cancelado')
                 ->whereHas('vehiculo', fn ($query) => $query->whereNull('deleted_at'))

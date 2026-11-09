@@ -27,6 +27,43 @@ class Repuesto extends Model
         'garantia_fin' => 'date:Y-m-d',
     ];
 
+    protected $appends = [
+        'estado_garantia',
+        'vehiculo',
+    ];
+
+    public function getEstadoGarantiaAttribute(): ?string
+    {
+        if (empty($this->garantia_fin)) {
+            return 'Sin garantía';
+        }
+
+        $fechaFin = $this->garantia_fin instanceof \Carbon\CarbonInterface
+            ? $this->garantia_fin
+            : \Illuminate\Support\Carbon::parse($this->garantia_fin);
+
+        return $fechaFin->startOfDay()->gte(now()->startOfDay()) ? 'Vigente' : 'Vencida';
+    }
+
+    public function getVehiculoAttribute(): ?Vehiculo
+    {
+        return $this->factura?->vehiculo ?? $this->mantenimiento?->vehiculo;
+    }
+
+    public function scopeGarantiaVigente($query, $date = null)
+    {
+        $date = $date ? \Illuminate\Support\Carbon::parse($date)->toDateString() : now()->toDateString();
+
+        return $query->whereNotNull('garantia_fin')->whereDate('garantia_fin', '>=', $date);
+    }
+
+    public function scopeGarantiaVencida($query, $date = null)
+    {
+        $date = $date ? \Illuminate\Support\Carbon::parse($date)->toDateString() : now()->toDateString();
+
+        return $query->whereNotNull('garantia_fin')->whereDate('garantia_fin', '<', $date);
+    }
+
     public function mantenimiento()
     {
         return $this->belongsTo(Mantenimiento::class, 'id_mantenimiento', 'id_mantenimiento');
