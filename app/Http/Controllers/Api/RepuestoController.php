@@ -53,6 +53,17 @@ class RepuestoController extends Controller
         return response()->json(Notificacion::orderByDesc('id_notificacion')->get());
     }
 
+    public function masUtilizados(): JsonResponse
+    {
+        $topRepuestos = Repuesto::topMasUtilizados(5);
+
+        return response()->json([
+            'success' => true,
+            'total' => $topRepuestos->count(),
+            'repuestos' => $topRepuestos,
+        ]);
+    }
+
     public function storeFromPdf(Request $request): JsonResponse
     {
         $mensajePdf = 'Solo se permiten archivos en formato PDF (.pdf).';
@@ -67,6 +78,7 @@ class RepuestoController extends Controller
             'numero_factura' => 'nullable|string|max:50',
             'nombre_pieza' => 'nullable|string|max:100',
             'codigo_pieza' => 'nullable|string|max:50',
+            'proveedor' => 'nullable|string|max:100',
             'comprobante_pdf' => 'bail|required|file|extensions:pdf|mimes:pdf|max:5120',
             'cantidad_recibida' => 'required|integer|min:1',
             'costo_unitario' => 'required|numeric|min:0',
@@ -128,6 +140,7 @@ class RepuestoController extends Controller
                 $repuesto = Repuesto::create([
                     'nombre_pieza' => trim($data['nombre_pieza'] ?? $piezaMatch[0] ?? $piezaCodigoMatch[1] ?? 'Pieza Automotriz No Identificada'),
                     'codigo_pieza' => filled($data['codigo_pieza'] ?? null) ? trim($data['codigo_pieza']) : ($codigoMatch[0] ?? 'REP-GENERICO'),
+                    'proveedor' => filled($data['proveedor'] ?? null) ? trim($data['proveedor']) : null,
                     'costo_unitario' => $data['costo_unitario'],
                     'id_mantenimiento' => $data['id_mantenimiento'] ?? null,
                     'id_factura' => $factura->id_factura,

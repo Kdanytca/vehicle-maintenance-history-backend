@@ -15,6 +15,7 @@ class Repuesto extends Model
     protected $fillable = [
         'nombre_pieza',
         'codigo_pieza',
+        'proveedor',
         'costo_unitario',
         'id_mantenimiento',
         'id_factura',
@@ -62,6 +63,31 @@ class Repuesto extends Model
         $date = $date ? \Illuminate\Support\Carbon::parse($date)->toDateString() : now()->toDateString();
 
         return $query->whereNotNull('garantia_fin')->whereDate('garantia_fin', '<', $date);
+    }
+
+    public static function topMasUtilizados(int $limite = 5)
+    {
+        return self::query()
+            ->select(
+                'nombre_pieza',
+                \Illuminate\Support\Facades\DB::raw('COUNT(*) as cantidad_utilizado'),
+                \Illuminate\Support\Facades\DB::raw("COALESCE(MAX(proveedor), 'Proveedor no especificado') as proveedor")
+            )
+            ->whereNotNull('nombre_pieza')
+            ->where('nombre_pieza', '!=', '')
+            ->groupBy('nombre_pieza')
+            ->orderByDesc('cantidad_utilizado')
+            ->orderBy('nombre_pieza')
+            ->limit($limite)
+            ->get()
+            ->map(function ($item) {
+                return [
+                    'nombre_repuesto' => $item->nombre_pieza,
+                    'nombre_pieza' => $item->nombre_pieza,
+                    'cantidad_utilizado' => (int) $item->cantidad_utilizado,
+                    'proveedor' => $item->proveedor ?: 'Proveedor no especificado',
+                ];
+            });
     }
 
     public function mantenimiento()

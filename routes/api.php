@@ -56,6 +56,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Repuestos y alertas
     Route::get('/repuestos', [RepuestoController::class, 'index']);
+    Route::get('/repuestos/mas-utilizados', [RepuestoController::class, 'masUtilizados'])
+        ->middleware('solo.admin');
     Route::post('/repuestos/cargar-pdf', [RepuestoController::class, 'storeFromPdf']);
     Route::get('/alertas', [RepuestoController::class, 'alertas']);
 
