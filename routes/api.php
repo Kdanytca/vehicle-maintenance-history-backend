@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\HistorialVehiculoController;
 use App\Http\Controllers\Api\MantenimientoController;
 use App\Http\Controllers\Api\NotificacionController;
 use App\Http\Controllers\Api\RecepcionController;
+use App\Http\Controllers\Api\ReporteInactivosController;
 use App\Http\Controllers\Api\ReportePdfController;
 use App\Http\Controllers\Api\RepuestoController;
 use App\Http\Controllers\Api\RolPermisoController;
@@ -40,6 +41,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/reportes/placa', [VehiculoController::class, 'reportePorPlaca']);
     Route::get('/reportes/placa/pdf', ReportePdfController::class)
+        ->middleware('solo.admin');
+    Route::get('/reportes/vehiculos-inactivos', [ReporteInactivosController::class, 'index'])
         ->middleware('solo.admin');
 
     // Mantenimientos e historial
