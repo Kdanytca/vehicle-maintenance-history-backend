@@ -172,7 +172,16 @@ class VehiculoController extends Controller
 
     public function reportePorPlaca(Request $request, \App\Services\ReporteVehiculo $reporte): JsonResponse
     {
-        $data = $request->validate(['placa' => 'required|string']);
+        $data = $request->validate([
+            'placa' => [
+                'required',
+                'string',
+                'regex:/^(RE|AB|MI|CC|CD|P|A|C|M|D|T|N|V)-?[0-9]{3}-?[0-9]{3}$/i',
+            ],
+        ], [
+            'placa.required' => 'El número de placa es obligatorio.',
+            'placa.regex' => 'El formato de la placa es inválido. Formato esperado por ejemplo P123-456.',
+        ]);
 
         return response()->json($reporte->porPlaca($data['placa']));
     }

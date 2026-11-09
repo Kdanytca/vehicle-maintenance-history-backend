@@ -56,12 +56,19 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/repuestos/cargar-pdf', [RepuestoController::class, 'storeFromPdf']);
     Route::get('/alertas', [RepuestoController::class, 'alertas']);
 
-    // Alertas de garantía
+    // Alertas de garantía y panel de garantías vencidas
     Route::get('/alertas-garantia', [AlertaGarantiaController::class, 'index']);
+    Route::get('/alertas-garantia/vencidas', [AlertaGarantiaController::class, 'vencidas']);
+    Route::get('/garantias-vencidas', [AlertaGarantiaController::class, 'vencidas']);
 
     Route::patch(
         '/alertas-garantia/{alerta}/atender',
         [AlertaGarantiaController::class, 'atender']
+    )->middleware('solo.admin');
+
+    Route::patch(
+        '/alertas-garantia/{alerta}/gestionar',
+        [AlertaGarantiaController::class, 'gestionar']
     )->middleware('solo.admin');
 
     // Recordatorios manuales por correo
