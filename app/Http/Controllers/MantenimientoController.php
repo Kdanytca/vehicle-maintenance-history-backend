@@ -11,7 +11,11 @@ class MantenimientoController extends Controller
 {
     public function index()
     {
-        $mantenimientos = Mantenimiento::with(['vehiculo', 'encargado'])->get();
+        $mantenimientos = Mantenimiento::with([
+            'vehiculo',
+            'encargado'
+        ])->get();
+
         return view('mantenimientos.index', compact('mantenimientos'));
     }
 
@@ -19,54 +23,64 @@ class MantenimientoController extends Controller
     {
         $usuarios = Usuario::all();
         $usuarioActivoId = auth()->id();
-
         $vehiculos = Vehiculo::all();
 
-        return view('mantenimientos.create', compact('usuarios', 'usuarioActivoId', 'vehiculos'));
+        return view(
+            'mantenimientos.create',
+            compact('usuarios', 'usuarioActivoId', 'vehiculos')
+        );
     }
 
     public function store(Request $request)
     {
-        $request->validate([
+        $datos = $request->validate([
             'fecha_servicio' => 'required|date',
+            'tipo_servicio' => 'nullable|string|max:100',
             'descripcion_falla' => 'required|string',
             'estado' => 'required|string',
             'costo_mano_obra' => 'nullable|numeric',
             'id_vehiculo' => 'required|exists:vehiculos,id_vehiculo',
-            'id_usuario_encargado' => 'required|exists:usuarios,id_usuario' // Validar que el encargado exista
+            'id_usuario_encargado' => 'required|exists:usuarios,id_usuario',
         ]);
 
-        Mantenimiento::create($request->all());
+        Mantenimiento::create($datos);
 
         return redirect()->route('mantenimientos.index')
             ->with('success', 'Mantenimiento registrado exitosamente.');
     }
 
-    // Mostrar formulario de editar
     public function edit($id)
     {
         $mantenimiento = Mantenimiento::findOrFail($id);
         $vehiculos = Vehiculo::all();
-
         $usuarios = Usuario::all();
         $usuarioActivoId = $mantenimiento->id_usuario_encargado;
 
-        return view('mantenimientos.edit', compact('mantenimiento', 'vehiculos', 'usuarios', 'usuarioActivoId'));
+        return view(
+            'mantenimientos.edit',
+            compact(
+                'mantenimiento',
+                'vehiculos',
+                'usuarios',
+                'usuarioActivoId'
+            )
+        );
     }
 
     public function update(Request $request, $id)
     {
-        $request->validate([
+        $datos = $request->validate([
             'fecha_servicio' => 'required|date',
+            'tipo_servicio' => 'nullable|string|max:100',
             'descripcion_falla' => 'required|string',
             'estado' => 'required|string',
             'costo_mano_obra' => 'nullable|numeric',
             'id_vehiculo' => 'required|exists:vehiculos,id_vehiculo',
-            'id_usuario_encargado' => 'required|exists:usuarios,id_usuario' // Agregado
+            'id_usuario_encargado' => 'required|exists:usuarios,id_usuario',
         ]);
 
         $mantenimiento = Mantenimiento::findOrFail($id);
-        $mantenimiento->update($request->all());
+        $mantenimiento->update($datos);
 
         return redirect()->route('mantenimientos.index')
             ->with('success', 'Mantenimiento actualizado exitosamente.');
@@ -76,7 +90,9 @@ class MantenimientoController extends Controller
     {
         $mantenimiento = Mantenimiento::findOrFail($id);
 
-        $mantenimiento->update(['estado' => 'Cancelado']);
+        $mantenimiento->update([
+            'estado' => 'Cancelado'
+        ]);
 
         return redirect()->route('mantenimientos.index')
             ->with('success', 'Mantenimiento cancelado exitosamente.');

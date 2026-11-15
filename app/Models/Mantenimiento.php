@@ -14,6 +14,7 @@ class Mantenimiento extends Model
         'fecha_servicio',
         'descripcion_falla',
         'estado',
+        'tipo_servicio',
         'costo_mano_obra',
         'id_vehiculo',
         'id_usuario_encargado'
@@ -24,7 +25,7 @@ class Mantenimiento extends Model
      */
     public function vehiculo()
     {
-        return $this->belongsTo(Vehiculo::class, 'id_vehiculo', 'id_vehiculo');
+        return $this->belongsTo(Vehiculo::class, 'id_vehiculo', 'id_vehiculo')->withTrashed();
     }
 
     /**

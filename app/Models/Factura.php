@@ -25,7 +25,7 @@ class Factura extends Model
      */
     public function vehiculo()
     {
-        return $this->belongsTo(Vehiculo::class, 'id_vehiculo', 'id_vehiculo');
+        return $this->belongsTo(Vehiculo::class, 'id_vehiculo', 'id_vehiculo')->withTrashed();
     }
 
     /**

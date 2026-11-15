@@ -2,10 +2,15 @@
 
 namespace App\Models;
 
+use App\Models\Cliente;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Vehiculo extends Model
 {
+    use SoftDeletes;
+
     protected $table = 'vehiculos';
 
     protected $primaryKey = 'id_vehiculo';
@@ -27,9 +32,19 @@ class Vehiculo extends Model
         );
     }
 
+    public function cliente(): BelongsTo
+    {
+        return $this->belongsTo(Cliente::class, 'cliente_id');
+    }
+
     public function mantenimientos()
     {
         return $this->hasMany(Mantenimiento::class, 'id_vehiculo', 'id_vehiculo');
+    }
+    // recepciones (estado en que llegó el vehículo cada vez)
+    public function recepciones()
+    {
+        return $this->hasMany(Recepcion::class, 'id_vehiculo', 'id_vehiculo');
     }
 
     public function facturas()

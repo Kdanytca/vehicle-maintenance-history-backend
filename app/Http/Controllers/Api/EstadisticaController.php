@@ -1,0 +1,58 @@
+<?php
+
+namespace App\Http\Controllers\Api;
+
+use App\Http\Controllers\Controller;
+use App\Models\Mantenimiento;
+use Illuminate\Support\Facades\DB;
+
+class EstadisticaController extends Controller
+{
+    public function index()
+    {
+        // Total de mantenimientos registrados
+        $totalMantenimientos = Mantenimiento::count();
+
+        // Los 5 vehículos con más servicios registrados
+        $vehiculosConMasServicios = DB::table('mantenimientos')
+            ->join(
+                'vehiculos',
+                'mantenimientos.id_vehiculo',
+                '=',
+                'vehiculos.id_vehiculo'
+            )
+            ->select(
+                'vehiculos.id_vehiculo',
+                'vehiculos.placa',
+                'vehiculos.marca',
+                'vehiculos.modelo',
+                DB::raw('COUNT(mantenimientos.id_mantenimiento) as total_servicios'),
+                DB::raw('COUNT(mantenimientos.id_mantenimiento) * 10 as total_servicios_x_10')
+            )
+            ->whereNotNull('mantenimientos.id_vehiculo')
+            ->groupBy(
+                'vehiculos.id_vehiculo',
+                'vehiculos.placa',
+                'vehiculos.marca',
+                'vehiculos.modelo'
+            )
+            ->orderByDesc('total_servicios')
+            ->limit(5)
+            ->get();
+
+        $respuesta = [
+            'total_mantenimientos' => $totalMantenimientos,
+            'vehiculos_con_mas_servicios' => $vehiculosConMasServicios,
+        ];
+
+        // Ganancias: solo servicios Completados y solo visibles para administradores.
+        if (auth()->user()?->rol?->nombre_rol === 'admin') {
+            $respuesta['ganancias_totales'] = round(
+                (float) Mantenimiento::where('estado', 'Completado')->sum('costo_mano_obra'),
+                2
+            );
+        }
+
+        return response()->json($respuesta);
+    }
+}

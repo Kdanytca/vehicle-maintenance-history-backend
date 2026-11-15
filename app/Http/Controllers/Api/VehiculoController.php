@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\AuditLog;
 use App\Models\Factura;
+use App\Models\HistorialCambio;
 use App\Models\Mantenimiento;
 use App\Models\Propietario;
 use App\Models\Repuesto;
@@ -16,46 +18,62 @@ class VehiculoController extends Controller
 {
     public function index(): JsonResponse
     {
-        return response()->json(Vehiculo::with('propietario')->latest('id_vehiculo')->get());
+        return response()->json(
+            Vehiculo::with('propietario')->withCount('recepciones')->latest('id_vehiculo')->get()
+        );
     }
 
     public function store(Request $request): JsonResponse
     {
         $data = $request->validate([
             'placa' => [
-            'required',
-            'string',
-            'max:10',
-            'regex:/^(P|A|C|M|D|T|RE|AB|MI|CC|CD|N|V)[0-9]{3}-[0-9]{3}$/i',
-            'unique:vehiculos,placa',
-    ],
-    'marca' => 'required|string|max:100',
-    'modelo' => 'required|string|max:100',
-    'anio' => 'required|integer|min:1900|max:' . (now()->year + 1),
-    'propietario' => 'required|string|max:150',
-        ]);
+                'required',
+                'string',
+                'max:10',
+                'regex:/^(P|A|C|M|D|T|RE|AB|MI|CC|CD|N|V)[0-9]{3}-[0-9]{3}$/i',
+                'unique:vehiculos,placa',
+            ],
+            'marca' => 'required|string|max:100',
+            'modelo' => 'required|string|max:6',
+            'anio' => 'required|integer|min:1900|max:' . (now()->year + 1),
+            'propietario' => 'required|string|max:150',
+        ] + RecepcionController::reglas(false)); // G2DS-16: campos de recepción
 
-        $propietario = Propietario::create([
-            'nombre' => $data['propietario'],
-            'documento_identidad' => null,
-            'telefono' => null,
-            'correo' => null,
-        ]);
+        // Si algo falla, no se guarda ni el vehículo ni la recepción.
+        return DB::transaction(function () use ($request, $data): JsonResponse {
+            $propietario = Propietario::create([
+                'nombre' => $data['propietario'],
+                'documento_identidad' => null,
+                'telefono' => null,
+                'correo' => null,
+            ]);
 
-        $vehiculo = Vehiculo::create([
-            'placa' => $data['placa'],
-            'marca' => $data['marca'],
-            'modelo' => $data['modelo'],
-            'anio' => $data['anio'],
-            'id_propietario' => $propietario->id_propietario,
-        ]);
+            $vehiculo = Vehiculo::create([
+                'placa' => $data['placa'],
+                'marca' => $data['marca'],
+                'modelo' => $data['modelo'],
+                'anio' => $data['anio'],
+                'id_propietario' => $propietario->id_propietario,
+            ]);
 
-        return response()->json($vehiculo->load('propietario'), 201);
+            AuditLog::registrar(
+                'crear',
+                'vehiculos',
+                'Se creó el vehículo '.$vehiculo->placa.' para el propietario '.$propietario->nombre
+            );
+
+            // G2DS-16: si se enviaron los datos de recepción, se guardan junto con el vehículo.
+            if ($request->filled('kilometraje')) {
+                RecepcionController::registrar($vehiculo, $data, $request->user()?->id_usuario);
+            }
+
+            return response()->json($vehiculo->load('propietario')->loadCount('recepciones'), 201);
+        });
     }
 
     public function show(int $vehiculo): JsonResponse
     {
-        $vehiculo = Vehiculo::with('propietario')->findOrFail($vehiculo);
+        $vehiculo = Vehiculo::withTrashed()->with('propietario')->findOrFail($vehiculo);
         $mantenimientos = Mantenimiento::where('id_vehiculo', $vehiculo->id_vehiculo)->orderByDesc('fecha_servicio')->get();
 
         return response()->json(compact('vehiculo', 'mantenimientos'));
@@ -63,143 +81,79 @@ class VehiculoController extends Controller
 
     public function update(Request $request, int $vehiculo): JsonResponse
     {
-        $vehiculo = Vehiculo::with('propietario')->findOrFail($vehiculo);
+        return DB::transaction(function () use ($request, $vehiculo): JsonResponse {
+            $vehiculo = Vehiculo::with('propietario')->lockForUpdate()->findOrFail($vehiculo);
 
-        $data = $request->validate([
-           'placa' => [
-               'required',
-               'string',
-               'max:10',
-               'regex:/^(P|A|C|M|D|T|RE|AB|MI|CC|CD|N|V)[0-9]{3}-[0-9]{3}$/i',
-               'unique:vehiculos,placa,' . $vehiculo->id_vehiculo . ',id_vehiculo',
-    ],
-    'marca' => 'required|string|max:100',
-    'modelo' => 'required|string|max:100',
-    'anio' => 'required|integer|min:1900|max:' . (now()->year + 1),
-    'propietario' => 'required|string|max:150',
-]);
+            $data = $request->validate([
+                'placa' => [
+                    'required',
+                    'string',
+                    'max:10',
+                    'regex:/^(P|A|C|M|D|T|RE|AB|MI|CC|CD|N|V)[0-9]{3}-[0-9]{3}$/i',
+                    'unique:vehiculos,placa,' . $vehiculo->id_vehiculo . ',id_vehiculo',
+                ],
+                'marca' => 'required|string|max:100',
+                'modelo' => 'required|string|max:6',
+                'anio' => 'required|integer|min:1900|max:' . (now()->year + 1),
+                'propietario' => 'required|string|max:150',
+            ]);
 
-        $vehiculo->update($request->only('placa', 'marca', 'modelo', 'anio'));
-        $vehiculo->propietario?->update(['nombre' => $data['propietario']]);
+            $vehiculo->update($request->only('placa', 'marca', 'modelo', 'anio'));
+            $vehiculo->propietario?->update(['nombre' => $data['propietario']]);
 
-        return response()->json($vehiculo->refresh()->load('propietario'));
+            AuditLog::registrar(
+                'editar',
+                'vehiculos',
+                'Se actualizó el vehículo '.$vehiculo->placa.' (marca: '.$vehiculo->marca.', modelo: '.$vehiculo->modelo.')'
+            );
+
+            return response()->json($vehiculo->refresh()->load('propietario'));
+        });
     }
 
     public function destroy(Request $request, int $vehiculo): JsonResponse
     {
         $vehiculo = Vehiculo::findOrFail($vehiculo);
-        $vehiculoId = $vehiculo->id_vehiculo;
         $impacto = $this->deleteImpact($vehiculo);
-
-        $debeConfirmar = $impacto['mantenimientos_pendientes'] > 0
-            || $impacto['mantenimientos_total'] > 0
-            || $impacto['facturas_total'] > 0
-            || $impacto['repuestos_total'] > 0;
-
-        if (! $debeConfirmar && $request->boolean('solo_validar')) {
+        if ($request->boolean('solo_validar')) {
             return response()->json([
-                'message' => 'El vehículo no tiene registros relacionados.',
-                'requires_confirmation' => false,
+                'message' => 'El archivo conservará los registros y costos; los trabajos pendientes o en proceso se cancelarán.',
+                'requires_confirmation' => true,
                 'impacto' => $impacto,
             ]);
         }
 
-        if ($debeConfirmar && ! $request->boolean('confirmar_eliminacion')) {
+        if (! $request->boolean('confirmar_eliminacion')) {
             return response()->json([
-                'message' => 'Confirma la eliminación del vehículo y sus registros relacionados.',
+                'message' => 'Confirma el archivo del vehículo y la cancelación de sus trabajos activos. Se conservarán los registros y costos.',
                 'requires_confirmation' => true,
                 'impacto' => $impacto,
             ], 409);
         }
 
-        if ($impacto['mantenimientos_pendientes'] > 0 && ! $request->boolean('cancelar_pendientes')) {
+        return DB::transaction(function () use ($request, $vehiculo): JsonResponse {
+            $vehiculo = Vehiculo::lockForUpdate()->findOrFail($vehiculo->id_vehiculo);
+            $impacto = $this->deleteImpact($vehiculo);
+            $cancelados = Mantenimiento::where('id_vehiculo', $vehiculo->id_vehiculo)
+                ->whereIn('estado', ['Pendiente', 'En Proceso'])
+                ->update(['estado' => 'Cancelado']);
+            $vehiculo->delete();
+
+            HistorialCambio::create([
+                'tipo_evento' => 'VEHICULO_ARCHIVADO',
+                'descripcion_evento' => "Vehículo {$vehiculo->placa} (ID {$vehiculo->id_vehiculo}) archivado. Trabajos cancelados: {$cancelados}. Registros y costos conservados.",
+                'direccion_ip' => $request->ip(),
+                'id_usuario' => $request->user()->id_usuario,
+            ]);
+
             return response()->json([
-                'message' => 'El vehículo tiene mantenimientos pendientes. Confirma si deseas cancelarlos antes de eliminar.',
-                'requires_pending_cancellation' => true,
+                'message' => 'Vehículo archivado correctamente. Se conservaron todos los registros y costos.',
+                'archived_id' => $vehiculo->id_vehiculo,
+                'deleted_at' => $vehiculo->deleted_at,
+                'mantenimientos_cancelados' => $cancelados,
                 'impacto' => $impacto,
-            ], 409);
-        }
-
-        $step = 'obtener_mantenimientos';
-
-        try {
-            $mantenimientoIds = DB::table('mantenimientos')
-                ->where('id_vehiculo', $vehiculoId)
-                ->pluck('id_mantenimiento');
-
-            $step = 'obtener_facturas';
-            $facturaIds = DB::table('facturas')
-                ->where('id_vehiculo', $vehiculoId)
-                ->pluck('id_factura');
-
-            $step = 'cancelar_mantenimientos_pendientes';
-            if ($impacto['mantenimientos_pendientes'] > 0) {
-                DB::table('mantenimientos')
-                    ->where('id_vehiculo', $vehiculoId)
-                    ->whereIn('estado', ['Pendiente', 'En Proceso'])
-                    ->update(['estado' => 'Cancelado']);
-            }
-
-            $step = 'eliminar_repuestos';
-            $repuestosEliminados = DB::table('repuestos')
-                ->where(function ($query) use ($facturaIds, $mantenimientoIds): void {
-                    $query->whereIn('id_factura', $facturaIds)
-                        ->orWhereIn('id_mantenimiento', $mantenimientoIds);
-                })
-                ->delete();
-
-            $step = 'eliminar_facturas';
-            $facturasEliminadas = DB::table('facturas')
-                ->where('id_vehiculo', $vehiculoId)
-                ->delete();
-
-            $step = 'eliminar_mantenimientos';
-            $mantenimientosEliminados = DB::table('mantenimientos')
-                ->where('id_vehiculo', $vehiculoId)
-                ->delete();
-
-            $step = 'eliminar_vehiculo';
-            $vehiculosEliminados = DB::table('vehiculos')
-                ->where('id_vehiculo', $vehiculoId)
-                ->delete();
-
-            $eliminados = [
-                'repuestos' => $repuestosEliminados,
-                'facturas' => $facturasEliminadas,
-                'mantenimientos' => $mantenimientosEliminados,
-                'vehiculos' => $vehiculosEliminados,
-            ];
-        } catch (\Throwable $exception) {
-            return response()->json([
-                'message' => 'Error eliminando vehículo.',
-                'step' => $step,
-                'deleted_id' => $vehiculoId,
-                'error' => $exception->getMessage(),
-                'impacto' => $impacto,
-            ], 500);
-        }
-
-        $existeDespues = DB::table('vehiculos')
-            ->where('id_vehiculo', $vehiculoId)
-            ->exists();
-
-        if ($existeDespues || $eliminados['vehiculos'] !== 1) {
-            return response()->json([
-                'message' => 'No se pudo confirmar la eliminación del vehículo.',
-                'deleted_id' => $vehiculoId,
-                'exists_after_delete' => $existeDespues,
-                'deleted_counts' => $eliminados,
-                'impacto' => $impacto,
-            ], 500);
-        }
-
-        return response()->json([
-            'message' => 'Vehículo eliminado correctamente.',
-            'deleted_id' => $vehiculoId,
-            'exists_after_delete' => false,
-            'deleted_counts' => $eliminados,
-            'impacto' => $impacto,
-        ]);
+            ]);
+        });
     }
 
     public function buscar(Request $request): JsonResponse
@@ -216,22 +170,20 @@ class VehiculoController extends Controller
         return response()->json($vehiculos);
     }
 
-    public function reportePorPlaca(Request $request): JsonResponse
+    public function reportePorPlaca(Request $request, \App\Services\ReporteVehiculo $reporte): JsonResponse
     {
-        $data = $request->validate(['placa' => 'required|string']);
-        $vehiculo = Vehiculo::with('propietario')->where('placa', trim($data['placa']))->first();
+        $data = $request->validate([
+            'placa' => [
+                'required',
+                'string',
+                'regex:/^(RE|AB|MI|CC|CD|P|A|C|M|D|T|N|V)-?[0-9]{3}-?[0-9]{3}$/i',
+            ],
+        ], [
+            'placa.required' => 'El número de placa es obligatorio.',
+            'placa.regex' => 'El formato de la placa es inválido. Formato esperado por ejemplo P123-456.',
+        ]);
 
-        if (! $vehiculo) {
-            return response()->json(['message' => 'La placa ingresada no existe.'], 404);
-        }
-
-        $mantenimientos = Mantenimiento::with('encargado')->where('id_vehiculo', $vehiculo->id_vehiculo)->orderBy('fecha_servicio')->get();
-
-        if ($mantenimientos->isEmpty()) {
-            return response()->json(['message' => 'No existen mantenimientos para esta placa.', 'vehiculo' => $vehiculo], 404);
-        }
-
-        return response()->json(compact('vehiculo', 'mantenimientos'));
+        return response()->json($reporte->porPlaca($data['placa']));
     }
 
     private function deleteImpact(Vehiculo $vehiculo): array

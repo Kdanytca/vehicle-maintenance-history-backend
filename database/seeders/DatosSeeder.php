@@ -16,7 +16,7 @@ class DatosSeeder extends Seeder
 {
     public function run(): void
     {
-        $propietario = Propietario::updateOrCreate([
+        $propietario = Propietario::firstOrCreate([
             'documento_identidad' => '01234567-8',
         ], [
             'nombre' => 'Carlos Martinez',
@@ -24,7 +24,7 @@ class DatosSeeder extends Seeder
             'correo' => 'carlos.demo@example.com',
         ]);
 
-        $vehiculo = Vehiculo::updateOrCreate([
+        $vehiculo = Vehiculo::firstOrCreate([
             'placa' => 'P-123456',
         ], [
             'marca' => 'Toyota',
@@ -35,7 +35,7 @@ class DatosSeeder extends Seeder
 
         $mecanico = Usuario::where('username', 'mecanico')->firstOrFail();
 
-        $mantenimiento = Mantenimiento::updateOrCreate([
+        $mantenimiento = Mantenimiento::firstOrCreate([
             'id_vehiculo' => $vehiculo->id_vehiculo,
             'fecha_servicio' => '2026-09-09',
         ], [
@@ -45,7 +45,7 @@ class DatosSeeder extends Seeder
             'id_usuario_encargado' => $mecanico->id_usuario,
         ]);
 
-        $factura = Factura::updateOrCreate([
+        $factura = Factura::firstOrCreate([
             'numero_factura' => 'FAC-DEMO-001',
         ], [
             'fecha_emision' => '2026-09-09',
@@ -54,7 +54,7 @@ class DatosSeeder extends Seeder
             'id_vehiculo' => $vehiculo->id_vehiculo,
         ]);
 
-        Repuesto::updateOrCreate([
+        Repuesto::firstOrCreate([
             'codigo_pieza' => 'REP-DEMO-001',
         ], [
             'nombre_pieza' => 'Filtro de Aceite Demo',
@@ -63,7 +63,7 @@ class DatosSeeder extends Seeder
             'id_factura' => $factura->id_factura,
         ]);
 
-        Notificacion::updateOrCreate([
+        Notificacion::firstOrCreate([
             'destinatario' => $propietario->correo,
             'asunto' => 'Servicio de demostracion registrado',
         ], [
@@ -72,10 +72,14 @@ class DatosSeeder extends Seeder
             'fecha_envio' => now(),
         ]);
 
-        HistorialCambio::updateOrCreate([
+        // Reconoce tambien el registro creado por el SQL historico de Neon.
+        HistorialCambio::whereIn('descripcion_evento', [
+            'Datos de demostracion cargados desde seeders.',
+            'Datos de demostracion cargados para el vehiculo P-123456 desde Neon SQL.',
+        ])->firstOrCreate([
             'tipo_evento' => 'LOG_SISTEMA',
-            'descripcion_evento' => 'Datos de demostracion cargados desde seeders.',
         ], [
+            'descripcion_evento' => 'Datos de demostracion cargados desde seeders.',
             'direccion_ip' => '127.0.0.1',
             'id_usuario' => $mecanico->id_usuario,
         ]);

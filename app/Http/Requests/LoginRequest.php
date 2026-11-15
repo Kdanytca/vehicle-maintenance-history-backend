@@ -2,6 +2,9 @@
 
 namespace App\Http\Requests;
 
+use App\Models\AuditLog;
+use App\Models\Usuario;
+use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 
 class LoginRequest extends FormRequest
@@ -14,9 +17,21 @@ class LoginRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'username' => 'required|string',
+            'username' => 'required|string|max:50',
             'password' => 'required|string',
         ];
+    }
+
+    protected function failedValidation(Validator $validator): void
+    {
+        $username = $this->input('username');
+        $usuario = is_string($username)
+            ? Usuario::with('rol')->where('username', $username)->first()
+            : null;
+
+        AuditLog::registrarAcceso(is_string($username) ? mb_substr($username, 0, 100) : null, $usuario, 'fallido');
+
+        parent::failedValidation($validator);
     }
 
     public function messages(): array
