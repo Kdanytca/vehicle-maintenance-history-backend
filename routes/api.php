@@ -82,7 +82,6 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Administración
     Route::middleware('solo.admin')->group(function () {
-
         Route::get(
             '/configuracion-alertas-garantia',
             [ConfiguracionAlertaGarantiaController::class, 'show']
@@ -103,7 +102,6 @@ Route::middleware('auth:sanctum')->group(function () {
             '/usuarios/{usuario}/desbloquear',
             [UsuarioController::class, 'desbloquear']
         );
-
         Route::get('/roles-permisos', [RolPermisoController::class, 'index']);
         Route::post('/roles', [RolPermisoController::class, 'storeRol']);
         Route::delete('/roles/{id}', [RolPermisoController::class, 'destroyRol']);
